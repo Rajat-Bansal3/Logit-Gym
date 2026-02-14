@@ -1,0 +1,353 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  OWNER
+  TRAINER
+  MEMBER
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  OVERDUE
+  FAILED
+  SUCCESS
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  BANK_TRANSFER
+}
+
+enum CheckInType {
+  IN
+  OUT
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  member       Member?
+  gymProfile   GymProfile? @relation(fields: [gymProfileId], references: [id])
+  gymProfileId String?
+  gym          Gym?
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Gym {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  maxCapacity Int      @default(100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  gymProfile       GymProfile?
+  ownerId          String
+  owner            User             @relation(fields: [ownerId], references: [id])
+  hourlyTraffic    HourlyTraffic[]
+  gymReports       GymReport[]
+  members          Member[]
+  attendanceLogs   AttendanceLog[]
+  transactions     Transaction[]
+  payments         Payment[]
+  weeklyActivities WeeklyActivity[]
+  gymMetrics       GymMetrics?
+
+  @@unique([ownerId]) // One gym per owner
+  @@index([ownerId])
+  @@map("gyms")
+}
+
+model Member {
+  id     String  @id @default(cuid())
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+  gymId  String
+  gym    Gym     @relation(fields: [gymId], references: [id])
+
+  // Personal Information
+  name      String
+  email     String? @unique
+  phone     String
+  avatarUrl String?
+  tagline   String?
+
+  // Physical Attributes
+  weight     Float?
+  height     Float?
+  age        Int?
+  bloodGroup String?
+
+  // Emergency Contact
+  emergencyContact String?
+
+  // Status
+  status MemberStatus @default(ACTIVE)
+
+  // Timestamps
+  joinDate  DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  membership       Membership?
+  attendanceLogs   AttendanceLog[]
+  transactions     Transaction[]
+  payments         Payment[]
+  weeklyActivities WeeklyActivity[]
+  memberMetrics    MemberMetrics?
+
+  @@index([gymId])
+  @@index([status])
+  @@index([joinDate])
+  @@index([email])
+  @@index([phone])
+  @@map("members")
+}
+
+model Membership {
+  id         String    @id @default(cuid())
+  memberId   String    @unique
+  member     Member    @relation(fields: [memberId], references: [id])
+  planName   String
+  expiryDate DateTime?
+  daysLeft   Int?
+  dueAmount  Float     @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  payments Payment[]
+
+  @@index([expiryDate])
+  @@index([memberId])
+  @@map("memberships")
+}
+
+model AttendanceLog {
+  id        String      @id @default(cuid())
+  memberId  String
+  member    Member      @relation(fields: [memberId], references: [id])
+  gymId     String
+  gym       Gym         @relation(fields: [gymId], references: [id])
+  type      CheckInType
+  timestamp DateTime    @default(now())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([memberId])
+  @@index([gymId])
+  @@index([timestamp])
+  @@index([memberId, timestamp])
+  @@map("attendance_logs")
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  memberId    String
+  member      Member          @relation(fields: [memberId], references: [id])
+  gymId       String
+  gym         Gym             @relation(fields: [gymId], references: [id])
+  amount      Float
+  date        DateTime        @default(now())
+  type        TransactionType
+  method      PaymentMethod
+  description String?
+  payerName   String?
+  status      PaymentStatus   @default(SUCCESS)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relation to Payment (optional, for reconciliation)
+  paymentId String?  @unique
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([memberId])
+  @@index([gymId])
+  @@index([date])
+  @@index([type])
+  @@index([status])
+  @@index([paymentId])
+  @@map("transactions")
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  memberId     String
+  member       Member        @relation(fields: [memberId], references: [id])
+  membershipId String
+  membership   Membership    @relation(fields: [membershipId], references: [id])
+  gymId        String
+  gym          Gym           @relation(fields: [gymId], references: [id])
+  amount       Float
+  dueDate      DateTime?
+  paidDate     DateTime?
+  description  String?
+  status       PaymentStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  transaction Transaction?
+
+  @@index([memberId])
+  @@index([membershipId])
+  @@index([gymId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([paidDate])
+  @@map("payments")
+}
+
+model GymProfile {
+  id    String @id @default(cuid())
+  gymId String @unique
+  gym   Gym    @relation(fields: [gymId], references: [id])
+
+  // Business Information
+  rating       Float?   @default(0)
+  totalReviews Int      @default(0)
+  images       String[]
+  amenities    String[]
+
+  // Promotions
+  referralOffer String?
+  referralCode  String? @unique
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+
+  @@index([gymId])
+  @@map("gym_profiles")
+}
+
+model WeeklyActivity {
+  id        String   @id @default(cuid())
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id])
+  gymId     String
+  gym       Gym      @relation(fields: [gymId], references: [id])
+  weekStart DateTime
+  monday    Float    @default(0)
+  tuesday   Float    @default(0)
+  wednesday Float    @default(0)
+  thursday  Float    @default(0)
+  friday    Float    @default(0)
+  saturday  Float    @default(0)
+  sunday    Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([memberId, weekStart])
+  @@index([memberId])
+  @@index([gymId])
+  @@index([weekStart])
+  @@map("weekly_activities")
+}
+
+model HourlyTraffic {
+  id        String   @id @default(cuid())
+  gymId     String
+  gym       Gym      @relation(fields: [gymId], references: [id])
+  date      DateTime
+  hour      Int
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([gymId, date, hour])
+  @@index([gymId])
+  @@index([date, hour])
+  @@index([gymId, date])
+  @@map("hourly_traffic")
+}
+
+model GymReport {
+  id               String   @id @default(cuid())
+  gymId            String
+  gym              Gym      @relation(fields: [gymId], references: [id])
+  reportDate       DateTime @default(now())
+  healthScore      Int
+  healthVerdict    String
+  monthlyRevenue   Float
+  projectedRevenue Float
+  activeMembers    Int
+  churnRiskCount   Int
+  aiInsights       String[]
+  weeklyData       Float[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([reportDate])
+  @@index([gymId, reportDate])
+  @@map("gym_reports")
+}
+
+// New: Gym Metrics for derived/calculated fields
+model GymMetrics {
+  id               String   @id @default(cuid())
+  gymId            String   @unique
+  gym              Gym      @relation(fields: [gymId], references: [id])
+  currentOccupancy Int      @default(0)
+  totalRevenue     Float    @default(0)
+  pendingDues      Float    @default(0)
+  growthPercentage Float    @default(0)
+  lastUpdated      DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([gymId])
+  @@map("gym_metrics")
+}
+
+model MemberMetrics {
+  id                   String        @id @default(cuid())
+  memberId             String        @unique
+  member               Member        @relation(fields: [memberId], references: [id])
+  attendancePercentage Float         @default(0)
+  currentStreak        Int           @default(0)
+  lastCheckIn          DateTime?
+  totalCheckIns        Int           @default(0)
+  paymentStatus        PaymentStatus @default(PENDING)
+  lastUpdated          DateTime      @default(now())
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([memberId])
+  @@index([paymentStatus])
+  @@map("member_metrics")
+}
