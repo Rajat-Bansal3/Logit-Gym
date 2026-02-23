@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { GymService } from "../services/gym.service";
 import { AppLogger } from "../../shared/utils/logger";
 import { createGymSchema, updateGymSchema } from "../../shared/types/gym.types";
-import { GymError, GymErrorCode } from "@/shared/errors/gym-errors";
+import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 
 export class GymController {
   private gymService: GymService;

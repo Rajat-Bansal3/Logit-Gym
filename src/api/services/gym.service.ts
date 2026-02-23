@@ -1,5 +1,5 @@
-import { AuthenticatedUser } from "@/shared/types/auth.types";
-import { CreateGym } from "@/shared/types/gym.types";
+import { AuthenticatedUser } from "../../shared/types/auth.types";
+import { CreateGym, UpdateGym } from "../../shared/types/gym.types";
 import { BaseResponse } from "../../shared/types/returns";
 import { client } from "../../shared/utils/prisma";
 import { GymRepository } from "../repositories/gym.repository";
@@ -77,7 +77,7 @@ export class GymService {
 
   async updateGym(
     gymId: string,
-    updates: Partial<CreateGym>,
+    updates: UpdateGym,
     user: AuthenticatedUser,
   ): Promise<BaseResponse<any>> {
     this.logger.debug("updateGym: updating gym", { gymId });

@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt, { JwtPayload } from "jsonwebtoken";
-import { UserRole } from "@/generated/enums";
-import { AuthError, AuthErrorCode } from "@/shared/errors/auth-errors";
+import { UserRole } from "../../generated/enums";
+import { AuthError, AuthErrorCode } from "../../shared/errors/auth-errors";
 import env from "../../env";
 import type {
   AccessTokenPayload,

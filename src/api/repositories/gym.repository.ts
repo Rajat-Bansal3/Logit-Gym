@@ -1,5 +1,5 @@
-import { Gym, Prisma, PrismaClient } from "@/generated/client";
-import { CreateGym } from "@/shared/types/gym.types";
+import { Gym, Prisma, PrismaClient } from "../../generated/client";
+import { CreateGym, UpdateGym } from "../../shared/types/gym.types";
 
 type gym_including_owner = Prisma.GymGetPayload<{
   include: {
@@ -123,48 +123,36 @@ export class GymRepository {
   }
   async upsertProfile(
     gymId: string,
-    profile: CreateGym["profile"],
+    profile: UpdateGym["profile"],
   ): Promise<void> {
+    if (!profile) return;
+
     await this.client.gymProfile.upsert({
       where: { gymId },
-
       create: {
         gymId,
-        timing: profile.timing,
-        openDays: profile.openDays,
-        fees: profile.fees,
-        genderAllowed: profile.genderAllowed,
-        ownerName: profile.ownerName,
-        ownerContact: profile.ownerContact,
-        amenities: profile.amenities,
-        images: profile.images,
-        fitnessProfession: profile.fitnessProfession,
-        referralOffer: profile.referralOffer,
+        timing: profile.timing ?? "09:00 - 21:00",
+        openDays: profile.openDays ?? [],
+        fees: profile.fees ?? 0,
+        genderAllowed: profile.genderAllowed ?? "ALL",
+        ownerName: profile.ownerName ?? "Unknown",
+        ownerContact: profile.ownerContact ?? "Unknown",
+        amenities: profile.amenities ?? [],
+        images: profile.images ?? [],
+        fitnessProfession: profile.fitnessProfession ?? null,
+        referralOffer: profile.referralOffer ?? null,
       },
-
       update: {
-        ...(profile.timing !== undefined && { timing: profile.timing }),
-        ...(profile.openDays !== undefined && { openDays: profile.openDays }),
+        ...(profile.timing && { timing: profile.timing }),
+        ...(profile.openDays && { openDays: profile.openDays }),
         ...(profile.fees !== undefined && { fees: profile.fees }),
-        ...(profile.genderAllowed !== undefined && {
-          genderAllowed: profile.genderAllowed,
-        }),
-        ...(profile.ownerName !== undefined && {
-          ownerName: profile.ownerName,
-        }),
-        ...(profile.ownerContact !== undefined && {
-          ownerContact: profile.ownerContact,
-        }),
-        ...(profile.amenities !== undefined && {
-          amenities: profile.amenities,
-        }),
-        ...(profile.images !== undefined && { images: profile.images }),
-        ...(profile.fitnessProfession !== undefined && {
-          fitnessProfession: profile.fitnessProfession,
-        }),
-        ...(profile.referralOffer !== undefined && {
-          referralOffer: profile.referralOffer,
-        }),
+        ...(profile.genderAllowed && { genderAllowed: profile.genderAllowed }),
+        ...(profile.ownerName && { ownerName: profile.ownerName }),
+        ...(profile.ownerContact && { ownerContact: profile.ownerContact }),
+        ...(profile.amenities && { amenities: profile.amenities }),
+        ...(profile.images && { images: profile.images }),
+        fitnessProfession: profile.fitnessProfession ?? null,
+        referralOffer: profile.referralOffer ?? null,
       },
     });
   }

@@ -18,8 +18,8 @@ export const createGymSchema = z.object({
 });
 
 export const updateGymSchema = z.object({
-  name: z.string().optional(),
-  address: z.string().optional(),
+  name: z.string().min(1).optional(),
+  address: z.string().min(1).optional(),
   profile: z
     .object({
       timing: z.string().optional(),
@@ -35,5 +35,6 @@ export const updateGymSchema = z.object({
     })
     .optional(),
 });
-export type CreateGym = z.infer<typeof createGymSchema>;
+
 export type UpdateGym = z.infer<typeof updateGymSchema>;
+export type CreateGym = z.infer<typeof createGymSchema>;
