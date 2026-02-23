@@ -43,6 +43,18 @@ export const registerSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+export type AccessTokenPayload = z.infer<
+  z.ZodObject<{
+    sub: z.ZodString;
+    role: z.ZodNativeEnum<typeof UserRole>;
+    gymId: z.ZodOptional<z.ZodString>;
+    memberId: z.ZodOptional<z.ZodString>;
+    iat: z.ZodNumber;
+    exp: z.ZodNumber;
+  }>
+>;
+
 export type ValidateAccessTokenResult = z.infer<
   z.ZodDiscriminatedUnion<
     "valid",
@@ -52,6 +64,8 @@ export type ValidateAccessTokenResult = z.infer<
         user: z.ZodObject<{
           id: z.ZodString;
           role: z.ZodNativeEnum<typeof UserRole>;
+          gymId: z.ZodOptional<z.ZodString>;
+          memberId: z.ZodOptional<z.ZodString>;
         }>;
       }>,
       z.ZodObject<{
@@ -60,11 +74,10 @@ export type ValidateAccessTokenResult = z.infer<
     ]
   >
 >;
-export type AccessTokenPayload = z.infer<
-  z.ZodObject<{
-    sub: z.ZodString;
-    role: z.ZodNativeEnum<typeof UserRole>;
-    iat: z.ZodNumber;
-    exp: z.ZodNumber;
-  }>
->;
+export const AuthenticatedUserSchema = z.object({
+  id: z.string(),
+  role: z.nativeEnum(UserRole),
+  gymId: z.string().optional(),
+  memberId: z.string().optional(),
+});
+export type AuthenticatedUser = z.infer<typeof AuthenticatedUserSchema>;

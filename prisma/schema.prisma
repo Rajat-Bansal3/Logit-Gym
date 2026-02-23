@@ -44,6 +44,13 @@ enum CheckInType {
   OUT
 }
 
+enum MembershipPlanType {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -52,11 +59,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  member       Member?
-  gymProfile   GymProfile? @relation(fields: [gymProfileId], references: [id])
-  gymProfileId String?
-  gym          Gym?
+  member Member?
+  gym    Gym[]
 
   @@index([email])
   @@index([role])
@@ -64,28 +68,26 @@ model User {
 }
 
 model Gym {
-  id          String   @id @default(cuid())
-  name        String
-  address     String
-  maxCapacity Int      @default(100)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
 
-  // Relations
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
   gymProfile       GymProfile?
-  ownerId          String
-  owner            User             @relation(fields: [ownerId], references: [id])
-  hourlyTraffic    HourlyTraffic[]
-  gymReports       GymReport[]
   members          Member[]
   attendanceLogs   AttendanceLog[]
   transactions     Transaction[]
   payments         Payment[]
   weeklyActivities WeeklyActivity[]
+  hourlyTraffic    HourlyTraffic[]
+  gymReports       GymReport[]
   gymMetrics       GymMetrics?
 
-  @@unique([ownerId]) // One gym per owner
-  @@index([ownerId])
   @@map("gyms")
 }
 
@@ -93,35 +95,36 @@ model Member {
   id     String  @id @default(cuid())
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id])
-  gymId  String
-  gym    Gym     @relation(fields: [gymId], references: [id])
 
-  // Personal Information
-  name      String
-  email     String? @unique
-  phone     String
-  avatarUrl String?
-  tagline   String?
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id])
 
-  // Physical Attributes
+  name        String
+  dateOfBirth DateTime
+  address     String
+  phone       String   @unique
+  email       String?  @unique
+  avatarUrl   String?
+  gender      String
+
+  emergencyContact String?
+
   weight     Float?
   height     Float?
   age        Int?
   bloodGroup String?
 
-  // Emergency Contact
-  emergencyContact String?
-
-  // Status
   status MemberStatus @default(ACTIVE)
 
-  // Timestamps
-  joinDate  DateTime
+  joinDate  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  membership       Membership?
+  membershipHistory Membership[] @relation("MemberToHistory")
+
+  currentMembershipId String?     @unique
+  currentMembership   Membership? @relation("CurrentMemberPlan", fields: [currentMembershipId], references: [id])
+
   attendanceLogs   AttendanceLog[]
   transactions     Transaction[]
   payments         Payment[]
@@ -137,30 +140,43 @@ model Member {
 }
 
 model Membership {
-  id         String    @id @default(cuid())
-  memberId   String    @unique
-  member     Member    @relation(fields: [memberId], references: [id])
-  planName   String
-  expiryDate DateTime?
-  daysLeft   Int?
-  dueAmount  Float     @default(0)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id       String @id @default(cuid())
+  memberId String
 
-  // Relations
+  member Member @relation("MemberToHistory", fields: [memberId], references: [id], onDelete: Cascade)
+
+  planType  MembershipPlanType
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean            @default(true)
+
+  planName  String?
+  dueAmount Float   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  successorId String?     @unique
+  successor   Membership? @relation("MembershipRenewal", fields: [successorId], references: [id])
+  predecessor Membership? @relation("MembershipRenewal")
+
   payments Payment[]
 
-  @@index([expiryDate])
+  currentForMember Member? @relation("CurrentMemberPlan")
+
+  @@unique([memberId, startDate])
   @@index([memberId])
+  @@index([endDate])
+  @@index([isActive])
   @@map("memberships")
 }
 
 model AttendanceLog {
   id        String      @id @default(cuid())
   memberId  String
-  member    Member      @relation(fields: [memberId], references: [id])
+  member    Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
   gymId     String
-  gym       Gym         @relation(fields: [gymId], references: [id])
+  gym       Gym         @relation(fields: [gymId], references: [id], onDelete: Cascade)
   type      CheckInType
   timestamp DateTime    @default(now())
   createdAt DateTime    @default(now())
@@ -176,40 +192,36 @@ model AttendanceLog {
 model Transaction {
   id          String          @id @default(cuid())
   memberId    String
-  member      Member          @relation(fields: [memberId], references: [id])
+  member      Member          @relation(fields: [memberId], references: [id], onDelete: Restrict)
   gymId       String
-  gym         Gym             @relation(fields: [gymId], references: [id])
+  gym         Gym             @relation(fields: [gymId], references: [id], onDelete: Restrict)
   amount      Float
   date        DateTime        @default(now())
   type        TransactionType
   method      PaymentMethod
   description String?
-  payerName   String?
   status      PaymentStatus   @default(SUCCESS)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  // Relation to Payment (optional, for reconciliation)
-  paymentId String?  @unique
-  payment   Payment? @relation(fields: [paymentId], references: [id])
+  payment Payment?
 
   @@index([memberId])
   @@index([gymId])
   @@index([date])
   @@index([type])
   @@index([status])
-  @@index([paymentId])
   @@map("transactions")
 }
 
 model Payment {
   id           String        @id @default(cuid())
   memberId     String
-  member       Member        @relation(fields: [memberId], references: [id])
+  member       Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
   membershipId String
-  membership   Membership    @relation(fields: [membershipId], references: [id])
+  membership   Membership    @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   gymId        String
-  gym          Gym           @relation(fields: [gymId], references: [id])
+  gym          Gym           @relation(fields: [gymId], references: [id], onDelete: Cascade)
   amount       Float
   dueDate      DateTime?
   paidDate     DateTime?
@@ -218,8 +230,8 @@ model Payment {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  // Relations
-  transaction Transaction?
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
 
   @@index([memberId])
   @@index([membershipId])
@@ -233,22 +245,29 @@ model Payment {
 model GymProfile {
   id    String @id @default(cuid())
   gymId String @unique
-  gym   Gym    @relation(fields: [gymId], references: [id])
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
 
-  // Business Information
+  bio           String?
+  timing        String
+  openDays      String[]
+  fees          Float
+  genderAllowed String
+
+  ownerName         String
+  ownerContact      String
+  fitnessProfession String?
+
   rating       Float?   @default(0)
   totalReviews Int      @default(0)
   images       String[]
   amenities    String[]
 
-  // Promotions
   referralOffer String?
   referralCode  String? @unique
+  referralUsed  Boolean @default(false)
 
-  // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  users     User[]
 
   @@index([gymId])
   @@map("gym_profiles")
@@ -257,9 +276,9 @@ model GymProfile {
 model WeeklyActivity {
   id        String   @id @default(cuid())
   memberId  String
-  member    Member   @relation(fields: [memberId], references: [id])
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
   gymId     String
-  gym       Gym      @relation(fields: [gymId], references: [id])
+  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
   weekStart DateTime
   monday    Float    @default(0)
   tuesday   Float    @default(0)
@@ -281,7 +300,7 @@ model WeeklyActivity {
 model HourlyTraffic {
   id        String   @id @default(cuid())
   gymId     String
-  gym       Gym      @relation(fields: [gymId], references: [id])
+  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
   date      DateTime
   hour      Int
   count     Int      @default(0)
@@ -298,7 +317,7 @@ model HourlyTraffic {
 model GymReport {
   id               String   @id @default(cuid())
   gymId            String
-  gym              Gym      @relation(fields: [gymId], references: [id])
+  gym              Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
   reportDate       DateTime @default(now())
   healthScore      Int
   healthVerdict    String
@@ -317,11 +336,10 @@ model GymReport {
   @@map("gym_reports")
 }
 
-// New: Gym Metrics for derived/calculated fields
 model GymMetrics {
   id               String   @id @default(cuid())
   gymId            String   @unique
-  gym              Gym      @relation(fields: [gymId], references: [id])
+  gym              Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
   currentOccupancy Int      @default(0)
   totalRevenue     Float    @default(0)
   pendingDues      Float    @default(0)
@@ -337,7 +355,7 @@ model GymMetrics {
 model MemberMetrics {
   id                   String        @id @default(cuid())
   memberId             String        @unique
-  member               Member        @relation(fields: [memberId], references: [id])
+  member               Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
   attendancePercentage Float         @default(0)
   currentStreak        Int           @default(0)
   lastCheckIn          DateTime?

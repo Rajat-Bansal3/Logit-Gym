@@ -1,10 +1,11 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import type { UserRole } from "@/generated/enums";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { UserRole } from "@/generated/enums";
 import { AuthError, AuthErrorCode } from "@/shared/errors/auth-errors";
 import env from "../../env";
 import type {
   AccessTokenPayload,
+  AuthenticatedUser,
   LoginInput,
   RegisterInput,
   ValidateAccessTokenResult,
@@ -15,14 +16,11 @@ import type {
   registerReturnType,
 } from "../../shared/types/returns";
 import { client } from "../../shared/utils/prisma";
-// import { AuthRepository } from "../repositories/auth.repository";
 import { UserRepository } from "../repositories/user.repository";
 
 export class AuthService {
-  // private authRepository: AuthRepository;
   private userRepository: UserRepository;
   constructor() {
-    // this.authRepository = new AuthRepository(client);
     this.userRepository = new UserRepository(client);
   }
 
@@ -79,10 +77,31 @@ export class AuthService {
   }
 
   private async generateTokens(userId: string, userRole: UserRole) {
-    const payload = {
+    let gymId: string | undefined;
+    let memberId: string | undefined;
+
+    if (userRole === UserRole.OWNER) {
+      //REVIEW
+      const gym = await client.gym.findFirst({
+        where: { ownerId: userId },
+        select: { id: true },
+      });
+      gymId = gym?.id;
+    } else {
+      const member = await client.member.findUnique({
+        where: { userId: userId },
+        select: { id: true, gymId: true },
+      });
+      memberId = member?.id;
+      gymId = member?.gymId;
+    }
+
+    const payload: JwtPayload = {
       sub: userId,
       role: userRole,
     };
+    if (gymId) payload.gymId = gymId;
+    if (memberId) payload.memberId = memberId;
 
     const authToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, {
       expiresIn: "15m",
@@ -107,15 +126,24 @@ export class AuthService {
     try {
       const payload = jwt.verify(
         token,
-        process.env.ACCESS_TOKEN_SECRET!,
+        env.JWT_ACCESS_SECRET!,
       ) as AccessTokenPayload;
+
+      const user: AuthenticatedUser = {
+        id: payload.sub,
+        role: payload.role,
+      };
+
+      if (payload.gymId) {
+        user.gymId = payload.gymId;
+      }
+      if (payload.memberId) {
+        user.memberId = payload.memberId;
+      }
 
       return {
         valid: true,
-        user: {
-          id: payload.sub,
-          role: payload.role,
-        },
+        user,
       };
     } catch {
       return { valid: false };
