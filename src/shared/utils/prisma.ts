@@ -1,6 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import env from "../../env";
+import { env } from "../../env";
 import { PrismaClient } from "../../generated/client";
 
 const globalForPrisma = globalThis as unknown as {
@@ -13,10 +13,10 @@ console.log(CON_STRING);
 
 export const adapter = new PrismaPg(pool);
 export const client =
-	process.env.NODE_ENV === "production"
+	env.NODE_ENV === "production"
 		? new PrismaClient({ adapter: adapter })
 		: (globalForPrisma.prisma ?? new PrismaClient({ adapter: adapter }));
 
-if (process.env.NODE_ENV !== "production") {
+if (env.NODE_ENV !== "production") {
 	globalForPrisma.prisma = client;
 }

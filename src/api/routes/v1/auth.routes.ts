@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { AuthController } from "../../controller/auth.controller";
 import { catchAsync } from "../../../shared/utils/util_functions";
+import { AuthController } from "../../controller/auth.controller";
 
 const router: Router = Router();
 const authController = new AuthController();

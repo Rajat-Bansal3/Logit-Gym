@@ -1,14 +1,15 @@
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
-import { ValidationError } from "@/shared/errors/validation-errors";
+import { env } from "../../env";
 import { AppError } from "../../shared/errors/app-errors";
+import { ValidationError } from "../../shared/errors/validation-errors";
 import { appLogger } from "../../shared/utils/logger";
 
 export const errorHandler = (error: Error, req: Request, res: Response, _next: NextFunction) => {
 	const logger = appLogger.withRequest(req);
 	let finalError = error;
 
-	if (process.env.NODE_ENV === "production") {
+	if (env.NODE_ENV === "production") {
 		return res.status(500).json({
 			error: "Internal Server Error",
 			message: "Something went wrong",
@@ -27,14 +28,14 @@ export const errorHandler = (error: Error, req: Request, res: Response, _next: N
 			...(finalError instanceof ValidationError && {
 				errors: finalError.errors,
 			}),
-			...(process.env.NODE_ENV !== "production" && { stack: finalError.stack }),
+			...(env.NODE_ENV !== "development" && { stack: finalError.stack }),
 		});
 	}
 	if (error instanceof AppError) {
 		return res.status(error.statusCode).json({
 			error: error.name,
 			message: error.message,
-			...(process.env.NODE_ENV !== "production" && {
+			...(env.NODE_ENV !== "development" && {
 				stack: error.stack,
 			}),
 		});

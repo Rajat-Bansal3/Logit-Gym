@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { UserRole } from "@/generated/enums";
+import { UserRole } from "../../generated/enums";
 
 export type BaseResponse<T = null> = {
 	success: boolean;

@@ -1,9 +1,8 @@
 import { Router } from "express";
+import { catchAsync } from "../../../shared/utils/util_functions";
+import { GymController } from "../../controller/gym.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { roleMiddleware } from "../../middleware/role.middleware";
-import { GymController } from "../../controller/gym.controller";
-
-import { catchAsync } from "../../../shared/utils/util_functions";
 
 const router = Router();
 const gymController = new GymController();
@@ -23,19 +22,11 @@ router.get("/:id", catchAsync(gymController.getGym));
 /**
  * Update gym information
  */
-router.patch(
-  "/:id",
-  roleMiddleware("OWNER"),
-  catchAsync(gymController.updateGym),
-);
+router.patch("/:id", roleMiddleware("OWNER"), catchAsync(gymController.updateGym));
 
 /**
  * Delete a gym
  */
-router.delete(
-  "/:id",
-  roleMiddleware("OWNER"),
-  catchAsync(gymController.deleteGym),
-);
+router.delete("/:id", roleMiddleware("OWNER"), catchAsync(gymController.deleteGym));
 
 export default router;

@@ -1,8 +1,8 @@
 import { config } from "dotenv";
-import { z } from "zod";
-import { appLogger } from "./shared/utils/logger";
 
 config();
+
+import { z } from "zod";
 
 const envSchema = z.object({
 	PORT: z.coerce.number(),
@@ -10,12 +10,11 @@ const envSchema = z.object({
 	JWT_ACCESS_SECRET: z.string().nonempty(),
 	JWT_REFRESH_SECRET: z.string().nonempty(),
 	SALT: z.coerce.number().default(10),
+	NODE_ENV: z.enum(["development", "testing", "production"]).default("development"),
 });
 const data = envSchema.safeParse(process.env);
-
 if (!data.success) {
-	appLogger.error("env vars not set");
 	process.exit(1);
 }
 
-export default data.data;
+export const env = data.data;

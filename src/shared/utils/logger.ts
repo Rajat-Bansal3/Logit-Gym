@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Request } from "express";
 import winston from "winston";
+import { env } from "../../env";
 
 const levels = {
 	error: 0,
@@ -34,7 +35,7 @@ export class AppLogger {
 	private logger: winston.Logger;
 
 	constructor() {
-		const isDev = process.env.NODE_ENV !== "production";
+		const isDev = env.NODE_ENV !== "production";
 
 		if (!isDev) {
 			ensureLogsDirectory();
@@ -74,7 +75,7 @@ export class AppLogger {
 			defaultMeta: { service: "Logit" },
 			format: isDev ? devFormat : prodFormat,
 			transports: this.getTransports(),
-			silent: process.env.NODE_ENV === "test",
+			silent: env.NODE_ENV === "testing",
 		});
 	}
 
@@ -102,7 +103,7 @@ export class AppLogger {
 	private getTransports() {
 		const transports: winston.transport[] = [new winston.transports.Console()];
 
-		if (process.env.NODE_ENV === "production") {
+		if (env.NODE_ENV === "production") {
 			transports.push(
 				new winston.transports.File({
 					filename: "logs/error.log",
