@@ -11,7 +11,7 @@ export class ValidationError extends AppError {
 	readonly errors: FieldError[];
 	constructor(zodError: ZodError, message: string = "Validation failed") {
 		super(message, 422);
-		this.errors = zodError.errors.map((issue) => ({
+		this.errors = zodError.issues.map((issue) => ({
 			field: issue.path.join("."),
 			message: issue.message,
 		}));
