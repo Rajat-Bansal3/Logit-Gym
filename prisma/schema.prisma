@@ -109,10 +109,9 @@ model Member {
 
   emergencyContact String?
 
-  weight     Float?
-  height     Float?
-  age        Int?
-  bloodGroup String?
+  weight Float?
+  height Float?
+  age    Int?
 
   status MemberStatus @default(ACTIVE)
 
