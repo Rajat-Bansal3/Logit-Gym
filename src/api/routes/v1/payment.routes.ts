@@ -25,9 +25,6 @@ router.get("/gyms/:gymId", paymentController.getPayments);
  * DELETE /gyms/:gymId/payments/:paymentId
  * Delete a specific payment
  */
-router.delete(
-  "/gyms/:gymId/payments/:paymentId",
-  paymentController.deletePayment,
-);
+router.delete("/gyms/:gymId/payments/:paymentId", paymentController.deletePayment);
 
 export default router;
