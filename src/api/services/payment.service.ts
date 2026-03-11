@@ -1,5 +1,5 @@
-import type { AuthenticatedUser } from "@/shared/types/auth.types";
 import { PaymentError, PaymentErrorCode } from "../../shared/errors/payment-errors";
+import type { AuthenticatedUser } from "../../shared/types/auth.types";
 import type {
 	CreatePaymentInput,
 	CreatePaymentOutput,

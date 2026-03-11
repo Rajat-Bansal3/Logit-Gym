@@ -1,6 +1,6 @@
-import type { OnboardMemberInput } from "@/shared/types/member.types";
-import type { BaseResponse } from "@/shared/types/returns";
-import { client } from "@/shared/utils/prisma";
+import type { OnboardMemberInput } from "../../shared/types/member.types";
+import type { BaseResponse } from "../../shared/types/returns";
+import { client } from "../../shared/utils/prisma";
 
 export class MemberRepository {
 	async createMember(data: OnboardMemberInput, gymId: string): Promise<BaseResponse<any>> {

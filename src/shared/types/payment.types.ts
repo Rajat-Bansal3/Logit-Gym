@@ -1,5 +1,5 @@
 import z from "zod";
-import type { Prisma } from "@/generated/client";
+import type { Prisma } from "../../generated/client";
 import { PaymentMethod, PaymentStatus, TransactionType } from "../../generated/enums";
 import type { paginationReturnType } from "./returns";
 

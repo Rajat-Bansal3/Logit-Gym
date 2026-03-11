@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@/generated/client";
+import type { PrismaClient } from "../../generated/client";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
 import type { CreateGym, UpdateGym } from "../../shared/types/gym.types";
