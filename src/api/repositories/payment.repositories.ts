@@ -1,10 +1,10 @@
-import { client } from "@/shared/utils/prisma";
 import { PaymentError, PaymentErrorCode } from "../../shared/errors/payment-errors";
 import type {
 	CreatePaymentInput,
 	CreatePaymentOutput,
 	GetPaymentsOutput,
 } from "../../shared/types/payment.types";
+import { client } from "../../shared/utils/prisma";
 
 export class PaymentRepository {
 	async createPayment(
