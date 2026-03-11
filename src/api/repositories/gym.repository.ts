@@ -85,7 +85,7 @@ export class GymRepository {
     isDeleted = false,
   }: {
     gymId: string;
-    isDeleted: boolean;
+    isDeleted?: boolean;
   }): Promise<Gym | null> {
     return await this.client.gym.findUnique({
       where: {
