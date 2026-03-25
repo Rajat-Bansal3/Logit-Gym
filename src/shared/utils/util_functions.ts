@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { MembershipPlanType } from "../../generated/enums";
 import { appLogger } from "./logger";
 
 /**
@@ -19,4 +20,26 @@ export function catchAsync<T extends Request, U extends Response, V extends Next
 			next(error);
 		});
 	};
+}
+
+export function computeMembershipEndDate(start: Date, planType: MembershipPlanType): Date {
+	const end = new Date(start);
+	const monthsMap: Record<MembershipPlanType, number> = {
+		[MembershipPlanType.MONTHLY]: 1,
+		[MembershipPlanType.QUARTERLY]: 3,
+		[MembershipPlanType.HALF_YEARLY]: 6,
+		[MembershipPlanType.YEARLY]: 12,
+	};
+	end.setMonth(end.getMonth() + monthsMap[planType]);
+	return end;
+}
+
+export function computeAge(dateOfBirth: Date): number {
+	const today = new Date();
+	let age = today.getFullYear() - dateOfBirth.getFullYear();
+	const m = today.getMonth() - dateOfBirth.getMonth();
+	if (m < 0 || (m === 0 && today.getDate() < dateOfBirth.getDate())) {
+		age--;
+	}
+	return age;
 }

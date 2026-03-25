@@ -1,41 +1,27 @@
-// import { Router } from "express";
-// import { MemberController } from "../../controller/member.controller";
-// import { authMiddleware } from "../../middleware/auth.middleware";
+import { Router } from "express";
+import { MemberController } from "../../controller/member.controller";
+import { authMiddleware } from "../../middleware/auth.middleware";
+import { roleMiddleware } from "../../middleware/role.middleware";
 
-// const router = Router();
-// const memberController = new MemberController();
+const router = Router({ mergeParams: true }); // mergeParams for :gymId from parent
+const controller = new MemberController();
 
-// // All member routes require authentication
-// router.use(authMiddleware);
+// All member routes require authentication
+router.use(authMiddleware);
 
-// /**
-//  * POST /gyms/:gymId/members
-//  * Onboard a new member to a specific gym
-//  */
-// router.post("/gyms/:gymId/members", memberController.onboardMember);
+// POST /gyms/:gymId/members — onboard a new member (owner only)
+router.post("/", roleMiddleware("OWNER"), controller.onboardMember);
 
-// /**
-//  * GET /gyms/:gymId/members
-//  * Get all members of a gym with optional filtering and pagination
-//  */
-// router.get("/gyms/:gymId/members", memberController.getGymMembers);
+// GET /gyms/:gymId/members — list all members
+router.get("/", roleMiddleware("OWNER"), controller.listMembers);
 
-// /**
-//  * GET /gyms/:gymId/members/:memberId
-//  * Get detailed information of a specific member within a gym
-//  */
-// router.get("/gyms/:gymId/members/:memberId", memberController.getGymMember);
+// GET /gyms/:gymId/members/:memberId
+router.get("/:memberId", roleMiddleware("OWNER"), controller.getMember);
 
-// /**
-//  * PUT /gyms/:gymId/members/:memberId
-//  * Update an existing member's information
-//  */
-// router.put("/gyms/:gymId/members/:memberId", memberController.updateMember);
+// PATCH /gyms/:gymId/members/:memberId
+router.patch("/:memberId", roleMiddleware("OWNER"), controller.updateMember);
 
-// /**
-//  * DELETE /gyms/:gymId/members/:memberId
-//  * Soft delete a member from the gym
-//  */
-// router.delete("/gyms/:gymId/members/:memberId", memberController.deleteMember);
+// DELETE /gyms/:gymId/members/:memberId — soft delete / deactivate
+router.delete("/:memberId", roleMiddleware("OWNER"), controller.deactivateMember);
 
-// export default router;
+export default router;
