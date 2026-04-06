@@ -23,5 +23,13 @@ router.patch("/:memberId", roleMiddleware("OWNER"), controller.updateMember);
 
 // DELETE /gyms/:gymId/members/:memberId — soft delete / deactivate
 router.delete("/:memberId", roleMiddleware("OWNER"), controller.deactivateMember);
+router.post("/attendance", roleMiddleware("OWNER"), controller.markAttendance);
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+router.get("/reports/overview", roleMiddleware("OWNER"), controller.getGymOverviewReport);
+
+router.get("/reports/attendance", roleMiddleware("OWNER"), controller.getAttendanceReport);
+
+router.get("/reports/metrics", roleMiddleware("OWNER"), controller.getMemberMetricsReport);
 
 export default router;

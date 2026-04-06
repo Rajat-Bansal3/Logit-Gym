@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MemberStatus, MembershipPlanType } from "../../generated/enums";
+import { CheckInType, MemberStatus, MembershipPlanType } from "../../generated/enums";
 
 export const onboardMemberSchema = z.object({
 	// core identity
@@ -43,6 +43,23 @@ export const listMembersQuerySchema = z.object({
 	limit: z.coerce.number().min(1).max(100).default(20),
 });
 
+export const markAttendanceSchema = z
+	.object({
+		type: z.nativeEnum(CheckInType),
+		email: z.string().email().optional(),
+		phone: z.string().min(1).optional(),
+	})
+	.refine((d) => d.email !== undefined || d.phone !== undefined, {
+		message: "Either email or phone is required",
+	});
+
+export const reportQuerySchema = z.object({
+	from: z.coerce.date().optional(),
+	to: z.coerce.date().optional(),
+});
+
 export type OnboardMember = z.infer<typeof onboardMemberSchema>;
 export type UpdateMember = z.infer<typeof updateMemberSchema>;
 export type ListMembersQuery = z.infer<typeof listMembersQuerySchema>;
+export type MarkAttendance = z.infer<typeof markAttendanceSchema>;
+export type ReportQuery = z.infer<typeof reportQuerySchema>;
