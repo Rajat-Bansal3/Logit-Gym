@@ -1,9 +1,11 @@
 import {
   type AttendanceLog,
   CheckInType,
+  Gym,
   type Member,
   type MemberMetrics,
   type Membership,
+  Payment,
   type Prisma,
   type PrismaClient,
 } from "../../generated/client";
@@ -74,6 +76,12 @@ export type MemberMetricsReport = {
     daysSinceLastCheckIn: number | null;
   }[];
 };
+
+export type MemberIncludingUser = Prisma.MemberGetPayload<{
+  include: {
+    user: true;
+  };
+}>;
 
 export class MemberRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -463,5 +471,67 @@ export class MemberRepository {
       paymentStatusBreakdown,
       churnRisk,
     };
+  }
+  async getMemberAttendace(userId: string): Promise<AttendanceLog[]> {
+    return (
+      (
+        await this.prisma.member.findUnique({
+          where: {
+            userId: userId,
+          },
+          include: {
+            attendanceLogs: true,
+          },
+        })
+      )?.attendanceLogs ?? []
+    );
+  }
+  async getMemberGym(userId: string): Promise<Gym | null> {
+    let member = await this.prisma.member.findUnique({
+      where: {
+        userId: userId,
+      },
+      include: {
+        gym: true,
+      },
+    });
+    if (!member) return null;
+    else return member.gym;
+  }
+  async getMemberPayments(userId: string): Promise<Payment[]> {
+    return (
+      (
+        await this.prisma.member.findUnique({
+          where: {
+            userId: userId,
+          },
+          include: {
+            payments: true,
+          },
+        })
+      )?.payments ?? []
+    );
+  }
+  async profile(userId: string): Promise<MemberIncludingUser | null> {
+    return await this.prisma.member.findUnique({
+      where: {
+        userId: userId,
+      },
+      include: {
+        user: true,
+      },
+    });
+  }
+  async getMemberDashboard(
+    userId: string,
+  ): Promise<MemberIncludingUser | null> {
+    return await this.prisma.member.findUnique({
+      where: {
+        userId: userId,
+      },
+      include: {
+        user: true,
+      },
+    });
   }
 }

@@ -1,259 +1,403 @@
 import type { NextFunction, Request, Response } from "express";
-import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import {
-	listMembersQuerySchema,
-	markAttendanceSchema,
-	onboardMemberSchema,
-	reportQuerySchema,
-	updateMemberSchema,
+  MemberError,
+  MemberErrorCode,
+} from "../../shared/errors/member-errors";
+import {
+  listMembersQuerySchema,
+  markAttendanceSchema,
+  onboardMemberSchema,
+  reportQuerySchema,
+  updateMemberSchema,
 } from "../../shared/types/member.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { MemberService } from "../services/member.services";
 
 export class MemberController {
-	private readonly memberService: MemberService;
-	private readonly logger: AppLogger;
+  private readonly memberService: MemberService;
+  private readonly logger: AppLogger;
 
-	constructor() {
-		this.memberService = new MemberService({ prisma: client });
-		this.logger = new AppLogger();
-	}
+  constructor() {
+    this.memberService = new MemberService({ prisma: client });
+    this.logger = new AppLogger();
+  }
 
-	onboardMember = async (req: Request, res: Response, next: NextFunction) => {
-		try {
-			this.logger.debug("onboardMember: request received", {
-				gymId: req.params.gymId,
-			});
+  onboardMember = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      this.logger.debug("onboardMember: request received", {
+        gymId: req.params.gymId,
+      });
 
-			const user = req.user;
-			const gymId = req.params.gymId;
+      const user = req.user;
+      const gymId = req.params.gymId;
 
-			if (!user || !gymId || Array.isArray(gymId)) {
-				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
-			}
+      if (!user || !gymId || Array.isArray(gymId)) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
 
-			const data = onboardMemberSchema.parse(req.body);
-			const result = await this.memberService.onboardMember(gymId, data, user);
+      const data = onboardMemberSchema.parse(req.body);
+      const result = await this.memberService.onboardMember(gymId, data, user);
 
-			this.logger.debug("onboardMember: completed", { gymId });
-			res.status(201).json(result);
-		} catch (error) {
-			this.logger.error("onboardMember: error", { error });
-			next(error);
-		}
-	};
+      this.logger.debug("onboardMember: completed", { gymId });
+      res.status(201).json(result);
+    } catch (error) {
+      this.logger.error("onboardMember: error", { error });
+      next(error);
+    }
+  };
 
-	getMember = async (req: Request, res: Response, next: NextFunction) => {
-		try {
-			this.logger.debug("getMember: request received", {
-				gymId: req.params.gymId,
-				memberId: req.params.memberId,
-			});
+  getMember = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      this.logger.debug("getMember: request received", {
+        gymId: req.params.gymId,
+        memberId: req.params.memberId,
+      });
 
-			const user = req.user;
-			const { gymId, memberId } = req.params;
+      const user = req.user;
+      const { gymId, memberId } = req.params;
 
-			if (!user || !gymId || !memberId || Array.isArray(gymId) || Array.isArray(memberId)) {
-				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
-			}
+      if (
+        !user ||
+        !gymId ||
+        !memberId ||
+        Array.isArray(gymId) ||
+        Array.isArray(memberId)
+      ) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
 
-			const result = await this.memberService.getMember(memberId, gymId, user);
+      const result = await this.memberService.getMember(memberId, gymId, user);
 
-			this.logger.debug("getMember: completed", { gymId, memberId });
-			res.status(200).json(result);
-		} catch (error) {
-			this.logger.error("getMember: error", {
-				gymId: req.params.gymId,
-				memberId: req.params.memberId,
-				error,
-			});
-			next(error);
-		}
-	};
+      this.logger.debug("getMember: completed", { gymId, memberId });
+      res.status(200).json(result);
+    } catch (error) {
+      this.logger.error("getMember: error", {
+        gymId: req.params.gymId,
+        memberId: req.params.memberId,
+        error,
+      });
+      next(error);
+    }
+  };
 
-	listMembers = async (req: Request, res: Response, next: NextFunction) => {
-		try {
-			this.logger.debug("listMembers: request received", {
-				gymId: req.params.gymId,
-			});
+  listMembers = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      this.logger.debug("listMembers: request received", {
+        gymId: req.params.gymId,
+      });
 
-			const user = req.user;
-			const gymId = req.params.gymId;
+      const user = req.user;
+      const gymId = req.params.gymId;
 
-			if (!user || !gymId || Array.isArray(gymId)) {
-				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
-			}
+      if (!user || !gymId || Array.isArray(gymId)) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
 
-			const query = listMembersQuerySchema.parse(req.query);
-			const result = await this.memberService.listMembers(gymId, query, user);
+      const query = listMembersQuerySchema.parse(req.query);
+      const result = await this.memberService.listMembers(gymId, query, user);
 
-			this.logger.debug("listMembers: completed", { gymId });
-			res.status(200).json(result);
-		} catch (error) {
-			this.logger.error("listMembers: error", {
-				gymId: req.params.gymId,
-				error,
-			});
-			next(error);
-		}
-	};
+      this.logger.debug("listMembers: completed", { gymId });
+      res.status(200).json(result);
+    } catch (error) {
+      this.logger.error("listMembers: error", {
+        gymId: req.params.gymId,
+        error,
+      });
+      next(error);
+    }
+  };
 
-	updateMember = async (req: Request, res: Response, next: NextFunction) => {
-		try {
-			this.logger.debug("updateMember: request received", {
-				gymId: req.params.gymId,
-				memberId: req.params.memberId,
-			});
+  updateMember = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      this.logger.debug("updateMember: request received", {
+        gymId: req.params.gymId,
+        memberId: req.params.memberId,
+      });
 
-			const user = req.user;
-			const { gymId, memberId } = req.params;
+      const user = req.user;
+      const { gymId, memberId } = req.params;
 
-			if (!user || !gymId || !memberId || Array.isArray(gymId) || Array.isArray(memberId)) {
-				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
-			}
+      if (
+        !user ||
+        !gymId ||
+        !memberId ||
+        Array.isArray(gymId) ||
+        Array.isArray(memberId)
+      ) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
 
-			const data = updateMemberSchema.parse(req.body);
-			const result = await this.memberService.updateMember(memberId, gymId, data, user);
+      const data = updateMemberSchema.parse(req.body);
+      const result = await this.memberService.updateMember(
+        memberId,
+        gymId,
+        data,
+        user,
+      );
 
-			this.logger.debug("updateMember: completed", { gymId, memberId });
-			res.status(200).json(result);
-		} catch (error) {
-			this.logger.error("updateMember: error", {
-				gymId: req.params.gymId,
-				memberId: req.params.memberId,
-				error,
-			});
-			next(error);
-		}
-	};
+      this.logger.debug("updateMember: completed", { gymId, memberId });
+      res.status(200).json(result);
+    } catch (error) {
+      this.logger.error("updateMember: error", {
+        gymId: req.params.gymId,
+        memberId: req.params.memberId,
+        error,
+      });
+      next(error);
+    }
+  };
 
-	deactivateMember = async (req: Request, res: Response, next: NextFunction) => {
-		try {
-			this.logger.debug("deactivateMember: request received", {
-				gymId: req.params.gymId,
-				memberId: req.params.memberId,
-			});
+  deactivateMember = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      this.logger.debug("deactivateMember: request received", {
+        gymId: req.params.gymId,
+        memberId: req.params.memberId,
+      });
 
-			const user = req.user;
-			const { gymId, memberId } = req.params;
+      const user = req.user;
+      const { gymId, memberId } = req.params;
 
-			if (!user || !gymId || !memberId || Array.isArray(gymId) || Array.isArray(memberId)) {
-				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
-			}
+      if (
+        !user ||
+        !gymId ||
+        !memberId ||
+        Array.isArray(gymId) ||
+        Array.isArray(memberId)
+      ) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
 
-			const result = await this.memberService.deactivateMember(memberId, gymId, user);
+      const result = await this.memberService.deactivateMember(
+        memberId,
+        gymId,
+        user,
+      );
 
-			this.logger.debug("deactivateMember: completed", { gymId, memberId });
-			res.status(200).json(result);
-		} catch (error) {
-			this.logger.error("deactivateMember: error", {
-				gymId: req.params.gymId,
-				memberId: req.params.memberId,
-				error,
-			});
-			next(error);
-		}
-	};
+      this.logger.debug("deactivateMember: completed", { gymId, memberId });
+      res.status(200).json(result);
+    } catch (error) {
+      this.logger.error("deactivateMember: error", {
+        gymId: req.params.gymId,
+        memberId: req.params.memberId,
+        error,
+      });
+      next(error);
+    }
+  };
 
-	markAttendance = async (req: Request, res: Response, next: NextFunction) => {
-		try {
-			this.logger.debug("markAttendance: request received", {
-				gymId: req.params.gymId,
-			});
-			const user = req.user;
-			const gymId = req.params.gymId;
-			if (!user || !gymId || Array.isArray(gymId)) {
-				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
-			}
+  markAttendance = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      this.logger.debug("markAttendance: request received", {
+        gymId: req.params.gymId,
+      });
+      const user = req.user;
+      const gymId = req.params.gymId;
+      if (!user || !gymId || Array.isArray(gymId)) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
 
-			const data = markAttendanceSchema.parse(req.body);
-			const result = await this.memberService.markAttendance(gymId, data, user);
+      const data = markAttendanceSchema.parse(req.body);
+      const result = await this.memberService.markAttendance(gymId, data, user);
 
-			this.logger.debug("markAttendance: completed", { gymId });
-			res.status(201).json(result);
-		} catch (error) {
-			this.logger.error("markAttendance: error", {
-				gymId: req.params.gymId,
-				error,
-			});
-			next(error);
-		}
-	};
+      this.logger.debug("markAttendance: completed", { gymId });
+      res.status(201).json(result);
+    } catch (error) {
+      this.logger.error("markAttendance: error", {
+        gymId: req.params.gymId,
+        error,
+      });
+      next(error);
+    }
+  };
 
-	// ── Reports ─────────────────────────────────────────────────────────────────
+  // ── Reports ─────────────────────────────────────────────────────────────────
 
-	getGymOverviewReport = async (req: Request, res: Response, next: NextFunction) => {
-		try {
-			this.logger.debug("getGymOverviewReport: request received", {
-				gymId: req.params.gymId,
-			});
-			const user = req.user;
-			const gymId = req.params.gymId;
-			if (!user || !gymId || Array.isArray(gymId)) {
-				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
-			}
-			const query = reportQuerySchema.parse(req.query);
-			const result = await this.memberService.getGymOverviewReport(gymId, query, user);
+  getGymOverviewReport = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      this.logger.debug("getGymOverviewReport: request received", {
+        gymId: req.params.gymId,
+      });
+      const user = req.user;
+      const gymId = req.params.gymId;
+      if (!user || !gymId || Array.isArray(gymId)) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
+      const query = reportQuerySchema.parse(req.query);
+      const result = await this.memberService.getGymOverviewReport(
+        gymId,
+        query,
+        user,
+      );
 
-			this.logger.debug("getGymOverviewReport: completed", { gymId });
-			res.status(200).json(result);
-		} catch (error) {
-			this.logger.error("getGymOverviewReport: error", {
-				gymId: req.params.gymId,
-				error,
-			});
-			next(error);
-		}
-	};
+      this.logger.debug("getGymOverviewReport: completed", { gymId });
+      res.status(200).json(result);
+    } catch (error) {
+      this.logger.error("getGymOverviewReport: error", {
+        gymId: req.params.gymId,
+        error,
+      });
+      next(error);
+    }
+  };
 
-	getAttendanceReport = async (req: Request, res: Response, next: NextFunction) => {
-		try {
-			this.logger.debug("getAttendanceReport: request received", {
-				gymId: req.params.gymId,
-			});
-			const user = req.user;
-			const gymId = req.params.gymId;
-			if (!user || !gymId || Array.isArray(gymId)) {
-				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
-			}
+  getAttendanceReport = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      this.logger.debug("getAttendanceReport: request received", {
+        gymId: req.params.gymId,
+      });
+      const user = req.user;
+      const gymId = req.params.gymId;
+      if (!user || !gymId || Array.isArray(gymId)) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
 
-			const query = reportQuerySchema.parse(req.query);
-			const result = await this.memberService.getAttendanceReport(gymId, query, user);
+      const query = reportQuerySchema.parse(req.query);
+      const result = await this.memberService.getAttendanceReport(
+        gymId,
+        query,
+        user,
+      );
 
-			this.logger.debug("getAttendanceReport: completed", { gymId });
-			res.status(200).json(result);
-		} catch (error) {
-			this.logger.error("getAttendanceReport: error", {
-				gymId: req.params.gymId,
-				error,
-			});
-			next(error);
-		}
-	};
+      this.logger.debug("getAttendanceReport: completed", { gymId });
+      res.status(200).json(result);
+    } catch (error) {
+      this.logger.error("getAttendanceReport: error", {
+        gymId: req.params.gymId,
+        error,
+      });
+      next(error);
+    }
+  };
 
-	getMemberMetricsReport = async (req: Request, res: Response, next: NextFunction) => {
-		try {
-			this.logger.debug("getMemberMetricsReport: request received", {
-				gymId: req.params.gymId,
-			});
-			const user = req.user;
-			const gymId = req.params.gymId;
-			if (!user || !gymId || Array.isArray(gymId)) {
-				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
-			}
+  getMemberMetricsReport = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      this.logger.debug("getMemberMetricsReport: request received", {
+        gymId: req.params.gymId,
+      });
+      const user = req.user;
+      const gymId = req.params.gymId;
+      if (!user || !gymId || Array.isArray(gymId)) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
 
-			const query = reportQuerySchema.parse(req.query);
-			const result = await this.memberService.getMemberMetricsReport(gymId, query, user);
+      const query = reportQuerySchema.parse(req.query);
+      const result = await this.memberService.getMemberMetricsReport(
+        gymId,
+        query,
+        user,
+      );
 
-			this.logger.debug("getMemberMetricsReport: completed", { gymId });
-			res.status(200).json(result);
-		} catch (error) {
-			this.logger.error("getMemberMetricsReport: error", {
-				gymId: req.params.gymId,
-				error,
-			});
-			next(error);
-		}
-	};
+      this.logger.debug("getMemberMetricsReport: completed", { gymId });
+      res.status(200).json(result);
+    } catch (error) {
+      this.logger.error("getMemberMetricsReport: error", {
+        gymId: req.params.gymId,
+        error,
+      });
+      next(error);
+    }
+  };
+
+  getMemberAttendance = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      this.logger.debug("getMemberAttendance: request received", {
+        memberId: req.params.memberId,
+      });
+      const user = req.user;
+      const memberId = req.params.memberId;
+      if (!user || !memberId || Array.isArray(memberId)) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
+      let attendances = this.memberService.getMemberAttendance(user.id);
+      this.logger.debug("getMemberAttendance Completed: ", memberId);
+      res.status(200).json(attendances);
+    } catch (error) {
+      next(error);
+    }
+  };
+  getMemberGym = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      this.logger.debug("getMemberGym request recieved");
+      const user = req.user;
+      if (!user) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
+      const gym = this.memberService.getMemberGym(user.id);
+      res.status(200).json(gym);
+    } catch (error) {
+      next(error);
+    }
+  };
+  getMemberPayments = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      this.logger.debug("getMemberPayments request recieved");
+      const user = req.user;
+      if (!user) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
+      const gym = this.memberService.getMemberPayments(user.id);
+      res.status(200).json(gym);
+    } catch (error) {
+      next(error);
+    }
+  };
+  profile = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      this.logger.debug("profile request recieved");
+      const user = req.user;
+      if (!user) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
+      const gym = this.memberService.profile(user.id);
+      res.status(200).json(gym);
+    } catch (error) {
+      next(error);
+    }
+  };
+  getMemberDashboard = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      this.logger.debug("getMemberDashboard request recieved");
+      const user = req.user;
+      if (!user) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
+      const gym = this.memberService.getMemberDashboard(user.id);
+      res.status(200).json(gym);
+    } catch (error) {
+      next(error);
+    }
+  };
 }

@@ -1,4 +1,11 @@
-import type { CheckInType, PrismaClient } from "../../generated/client";
+import { success } from "zod";
+import type {
+  AttendanceLog,
+  CheckInType,
+  Gym,
+  Payment,
+  PrismaClient,
+} from "../../generated/client";
 import {
   MemberError,
   MemberErrorCode,
@@ -17,6 +24,7 @@ import { client } from "../../shared/utils/prisma";
 import {
   type AttendanceReport,
   type GymOverviewReport,
+  MemberIncludingUser,
   type MemberListResult,
   type MemberMetricsReport,
   MemberRepository,
@@ -278,6 +286,67 @@ export class MemberService {
       message: "Member metrics report fetched successfully",
       success: true,
       data: report,
+    };
+  }
+  async getMemberAttendance(
+    userId: string,
+  ): Promise<BaseResponse<AttendanceLog[]>> {
+    this.logger.debug("getMemberAttendace completed", userId);
+    const attendance = await this.memberRepository.getMemberAttendace(userId);
+    return {
+      message: "attendaces fetched successfully",
+      success: true,
+      data: attendance,
+    };
+  }
+  async getMemberGym(userId: string): Promise<BaseResponse<Gym>> {
+    this.logger.debug("getMemberGym request recieved");
+    const gym = await this.memberRepository.getMemberGym(userId);
+    if (!gym) {
+      throw new MemberError(MemberErrorCode.NOT_FOUND, "member not found");
+    }
+    return {
+      message: "gym fetched successfully",
+      success: true,
+      data: gym,
+    };
+  }
+  async getMemberPayments(userId: string): Promise<BaseResponse<Payment[]>> {
+    this.logger.debug("getMemberPayments request recieved");
+    const payments = await this.memberRepository.getMemberPayments(userId);
+    if (!payments) {
+      throw new MemberError(MemberErrorCode.NOT_FOUND, "member not found");
+    }
+    return {
+      message: "payments fetched successfully",
+      success: true,
+      data: payments,
+    };
+  }
+  async profile(userId: string): Promise<BaseResponse<MemberIncludingUser>> {
+    this.logger.debug("profile request recieved");
+    const profile = await this.memberRepository.profile(userId);
+    if (!profile) {
+      throw new MemberError(MemberErrorCode.NOT_FOUND, "member not found");
+    }
+    return {
+      message: "profile fetched successfully",
+      success: true,
+      data: profile,
+    };
+  }
+  async getMemberDashboard(
+    userId: string,
+  ): Promise<BaseResponse<MemberIncludingUser>> {
+    this.logger.debug("getMemberDashboard request recieved");
+    const dashboard = await this.memberRepository.getMemberDashboard(userId);
+    if (!dashboard) {
+      throw new MemberError(MemberErrorCode.NOT_FOUND, "member not found");
+    }
+    return {
+      message: "dashboard fetched successfully",
+      success: true,
+      data: dashboard,
     };
   }
 }

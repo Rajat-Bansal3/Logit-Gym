@@ -19,16 +19,24 @@ router.post("/", roleMiddleware("OWNER"), catchAsync(gymController.createGym));
 /**
  * Get gym details
  */
-router.get("/:id", catchAsync(gymController.getGym));
+router.get("/:id", roleMiddleware("OWNER"), catchAsync(gymController.getGym));
 
 /**
  * Update gym information
  */
-router.patch("/:id", roleMiddleware("OWNER"), catchAsync(gymController.updateGym));
+router.patch(
+  "/:id",
+  roleMiddleware("OWNER"),
+  catchAsync(gymController.updateGym),
+);
 
 /**
  * Delete a gym
  */
-router.delete("/:id", roleMiddleware("OWNER"), catchAsync(gymController.deleteGym));
+router.delete(
+  "/:id",
+  roleMiddleware("OWNER"),
+  catchAsync(gymController.deleteGym),
+);
 
 export default router;
