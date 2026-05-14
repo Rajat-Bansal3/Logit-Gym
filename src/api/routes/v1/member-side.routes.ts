@@ -1,4 +1,4 @@
-import { MemberController } from "@/api/controller/member.controller";
+import { MemberController } from "../../controller/member.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { roleMiddleware } from "../../middleware/role.middleware";
 import { Router } from "express";
