@@ -1,4 +1,7 @@
-import { MemberError, MemberErrorCode } from "@/shared/errors/member-errors";
+import {
+  MemberError,
+  MemberErrorCode,
+} from "../../shared/errors/member-errors";
 import {
   type AttendanceLog,
   CheckInType,
