@@ -1,3 +1,4 @@
+import { MemberError, MemberErrorCode } from "@/shared/errors/member-errors";
 import {
   type AttendanceLog,
   CheckInType,
@@ -82,6 +83,23 @@ export type MemberIncludingUser = Prisma.MemberGetPayload<{
     user: true;
   };
 }>;
+
+export type MemberDashboardData = Prisma.MemberGetPayload<{
+  include: {
+    gym: true;
+    currentMembership: true;
+    user: true;
+  };
+}>;
+export type MemberDashboardOut = {
+  memberId: string;
+  gymId: string;
+  name: string;
+  plan: string;
+  days_left: Date | null;
+  due_amount: number;
+  activity_graph: number[];
+};
 
 export class MemberRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -524,14 +542,47 @@ export class MemberRepository {
   }
   async getMemberDashboard(
     userId: string,
-  ): Promise<MemberIncludingUser | null> {
+  ): Promise<MemberDashboardData | null> {
     return await this.prisma.member.findUnique({
       where: {
         userId: userId,
       },
       include: {
         user: true,
+        currentMembership: true,
+        gym: true,
       },
     });
+  }
+  async getGymOccupancy(memberId: string) {
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - 60 * 60 * 1000);
+    let gym = await this.prisma.member.findUnique({
+      where: {
+        id: memberId,
+      },
+      select: {
+        gymId: true,
+      },
+    });
+    if (!gym)
+      throw new MemberError(MemberErrorCode.NOT_FOUND, " member not found");
+    const gymId = gym.gymId;
+    return await this.prisma.$transaction([
+      this.prisma.attendanceLog.count({
+        where: {
+          gymId,
+          type: CheckInType.IN,
+          timestamp: { gte: windowStart, lte: now },
+        },
+      }),
+      this.prisma.attendanceLog.count({
+        where: {
+          gymId,
+          type: CheckInType.OUT,
+          timestamp: { gte: windowStart, lte: now },
+        },
+      }),
+    ]);
   }
 }

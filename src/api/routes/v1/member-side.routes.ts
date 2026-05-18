@@ -24,5 +24,15 @@ router.get(
 );
 
 router.get("/profile", roleMiddleware("MEMBER"), memberController.profile);
+router.get(
+  "/dashboard",
+  roleMiddleware("MEMBER"),
+  memberController.getMemberDashboard,
+);
+router.get(
+  "/occupancy",
+  roleMiddleware("MEMBER"),
+  memberController.getGymOccupancy,
+);
 
 export default router;

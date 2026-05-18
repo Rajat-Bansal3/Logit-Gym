@@ -23,6 +23,7 @@ import { client } from "../../shared/utils/prisma";
 import {
   type AttendanceReport,
   type GymOverviewReport,
+  MemberDashboardOut,
   MemberIncludingUser,
   type MemberListResult,
   type MemberMetricsReport,
@@ -336,16 +337,41 @@ export class MemberService {
   }
   async getMemberDashboard(
     userId: string,
-  ): Promise<BaseResponse<MemberIncludingUser>> {
+  ): Promise<BaseResponse<MemberDashboardOut>> {
     this.logger.debug("getMemberDashboard request recieved");
     const dashboard = await this.memberRepository.getMemberDashboard(userId);
-    if (!dashboard) {
-      throw new MemberError(MemberErrorCode.NOT_FOUND, "member not found");
-    }
+    if (!dashboard || !dashboard.currentMembership)
+      throw new MemberError(
+        MemberErrorCode.NOT_FOUND,
+        "no dashboard with member found",
+      );
+    const plan_name =
+      dashboard.currentMembership.planName ??
+      dashboard.currentMembership.planType.toString();
+    let res: MemberDashboardOut = {
+      gymId: dashboard?.gymId,
+      memberId: dashboard?.id,
+      name: dashboard?.name,
+      plan: plan_name,
+      days_left: dashboard.currentMembership.endDate,
+      activity_graph: [0],
+      due_amount: dashboard.currentMembership.dueAmount,
+    };
     return {
       message: "dashboard fetched successfully",
       success: true,
-      data: dashboard,
+      data: res,
+    };
+  }
+  async getGymOccupancy(memberId: string): Promise<BaseResponse<number>> {
+    this.logger.debug("getGymOccupancy request recieved");
+    const [checkIns, checkOuts] =
+      await this.memberRepository.getGymOccupancy(memberId);
+
+    return {
+      message: "Occupancy fetched successfully",
+      success: true,
+      data: Math.max(0, checkIns - checkOuts),
     };
   }
 }

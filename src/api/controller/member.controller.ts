@@ -366,11 +366,7 @@ export class MemberController {
       next(error);
     }
   };
-  profile = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ) => {
+  profile = async (req: Request, res: Response, next: NextFunction) => {
     try {
       this.logger.debug("profile request recieved");
       const user = req.user;
@@ -395,6 +391,19 @@ export class MemberController {
         throw new MemberError(MemberErrorCode.UNAUTHORIZED);
       }
       const gym = this.memberService.getMemberDashboard(user.id);
+      res.status(200).json(gym);
+    } catch (error) {
+      next(error);
+    }
+  };
+  getGymOccupancy = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      this.logger.debug("getGymOccupancy request recieved");
+      const user = req.user;
+      if (!user || !user.memberId) {
+        throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+      }
+      const gym = this.memberService.getGymOccupancy(user.memberId);
       res.status(200).json(gym);
     } catch (error) {
       next(error);
