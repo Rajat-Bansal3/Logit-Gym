@@ -16,7 +16,7 @@ router.get(
 );
 
 router.post(
-  "/attendance/:hash",
+  "/attendance/",
   roleMiddleware("MEMBER"),
   memberController.markAttendance,
 );
