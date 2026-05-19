@@ -1,5 +1,5 @@
 import z from "zod";
-import type { Prisma } from "../../generated/client";
+import type { Payment, Prisma } from "../../generated/client";
 import { PaymentMethod, PaymentStatus, TransactionType } from "../../generated/enums";
 import type { paginationReturnType } from "./returns";
 
@@ -30,6 +30,6 @@ export const getPaymentsQuerySchema = z.object({
 });
 
 export type GetPaymentsOutput = {
-	payments: Prisma.PaymentGetPayload<{}>[];
+	payments: Payment[];
 	pagination: paginationReturnType;
 };

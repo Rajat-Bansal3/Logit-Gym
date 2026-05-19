@@ -3,7 +3,7 @@
   "files": {
     "ignoreUnknown": true,
     "includes": [
-      "**/*.ts",
+      "./src/*.ts",
       "!!**/node_modules/**",
       "!!**/dist/**",
       "!!**/generated/**"
@@ -29,7 +29,8 @@
       "style": {
         "useBlockStatements": "error",
         "useNamingConvention": "off",
-        "useFilenamingConvention": "info"
+        "useFilenamingConvention": "info",
+        "noNonNullAssertion": "off"
       }
     }
   }

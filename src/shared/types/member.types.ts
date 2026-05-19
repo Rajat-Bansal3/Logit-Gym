@@ -43,15 +43,10 @@ export const listMembersQuerySchema = z.object({
 	limit: z.coerce.number().min(1).max(100).default(20),
 });
 
-export const markAttendanceSchema = z
-	.object({
-		type: z.nativeEnum(CheckInType),
-		email: z.string().email().optional(),
-		phone: z.string().min(1).optional(),
-	})
-	.refine((d) => d.email !== undefined || d.phone !== undefined, {
-		message: "Either email or phone is required",
-	});
+export const markAttendanceSchema = z.object({
+	type: z.enum(CheckInType),
+	gym_hash: z.string().min(1),
+});
 
 export const reportQuerySchema = z.object({
 	from: z.coerce.date().optional(),

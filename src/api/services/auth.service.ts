@@ -104,7 +104,7 @@ export class AuthService {
 		}
 
 		const authToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, {
-			expiresIn: "15m",
+			expiresIn: "15d",
 		});
 
 		const refreshToken = jwt.sign({ sub: userId }, env.JWT_REFRESH_SECRET, {

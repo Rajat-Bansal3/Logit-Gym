@@ -71,6 +71,7 @@ model Gym {
   id        String   @id @default(cuid())
   name      String
   address   String
+  hash      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   isDeleted Boolean  @default(false)

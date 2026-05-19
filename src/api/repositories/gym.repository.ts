@@ -34,6 +34,7 @@ export class GymRepository {
 				name: data.name,
 				address: data.address,
 				ownerId: data.ownerId,
+				hash: `${data.name}-${crypto.randomUUID()}`,
 			},
 		});
 	};
