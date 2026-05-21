@@ -275,10 +275,11 @@ export class MemberRepository {
         };
       };
     }>,
+    day: string,
   ): Promise<AttendanceLog> {
     return this.prisma.$transaction(async (tx) => {
       const log = await tx.attendanceLog.create({
-        data: { gymId: member.gymId, memberId: member.id, type: "IN" },
+        data: { gymId: member.gymId, day, memberId: member.id, type: "IN" },
       });
 
       await tx.memberMetrics.update({
@@ -297,7 +298,7 @@ export class MemberRepository {
     gymId: string,
     query: ReportQuery,
   ): Promise<GymOverviewReport> {
-    console.log(gymId, query);
+    
     // const { from, to } = query;
     // const hasDateFilter = from !== undefined || to !== undefined;
     // const dateFilter = {
@@ -566,6 +567,7 @@ export class MemberRepository {
   async getMemberDashboard(
     memberId: string,
   ): Promise<MemberDashboardData | null> {
+    
     return await this.prisma.member.findUnique({
       where: {
         id: memberId,

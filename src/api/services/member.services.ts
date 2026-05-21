@@ -205,7 +205,7 @@ export class MemberService {
         "member not from this gym",
       );
     }
-    const log = await this.memberRepository.markAttendance(member);
+    const log = await this.memberRepository.markAttendance(member, data.day);
 
     return {
       message: `Checked in successfully`,
@@ -307,7 +307,7 @@ export class MemberService {
     };
   }
   async profile(memberId: string): Promise<BaseResponse<MemberIncludingUser>> {
-    this.logger.debug("profile request recieved");
+    this.logger.debug("profile request recieved , memberId is :", memberId);
     const profile = await this.memberRepository.profile(memberId);
     if (!profile) {
       throw new MemberError(MemberErrorCode.NOT_FOUND, "member not found");
@@ -321,7 +321,9 @@ export class MemberService {
   async getMemberDashboard(
     memberId: string,
   ): Promise<BaseResponse<MemberDashboardOut>> {
-    this.logger.debug("getMemberDashboard request recieved");
+    this.logger.debug("getMemberDashboard request recieved , memberId is : ", {
+      id: memberId,
+    });
     const dashboard = await this.memberRepository.getMemberDashboard(memberId);
     if (!dashboard || !dashboard.currentMembership) {
       throw new MemberError(

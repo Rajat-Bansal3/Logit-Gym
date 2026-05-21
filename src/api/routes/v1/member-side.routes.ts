@@ -10,13 +10,13 @@ router.use(authMiddleware);
 const memberController = new MemberController();
 
 router.get(
-  "/attendance",
+  "/attendance/members",
   roleMiddleware("MEMBER"),
   memberController.getMemberAttendance,
 );
 
 router.post(
-  "/attendance/",
+  "/attendance",
   roleMiddleware("MEMBER"),
   memberController.markAttendance,
 );
@@ -29,12 +29,24 @@ router.get(
   memberController.getMemberPayments,
 );
 
-router.get("/profile", roleMiddleware("MEMBER"), memberController.profile);
+router.get(
+  "/profile",
+  roleMiddleware("MEMBER"),
+  (req, _res, next) => {
+    next();
+  },
+  memberController.profile,
+);
+
 router.get(
   "/dashboard",
   roleMiddleware("MEMBER"),
+  (req, _res, next) => {
+    next();
+  },
   memberController.getMemberDashboard,
 );
+
 router.get(
   "/occupancy",
   roleMiddleware("MEMBER"),

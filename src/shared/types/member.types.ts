@@ -45,6 +45,7 @@ export const listMembersQuerySchema = z.object({
 
 export const markAttendanceSchema = z.object({
   gym_hash: z.string().min(1),
+  day: z.string().min(1).max(10),
 });
 
 export const reportQuerySchema = z.object({

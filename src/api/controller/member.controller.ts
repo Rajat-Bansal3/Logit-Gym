@@ -330,10 +330,12 @@ export class MemberController {
     try {
       this.logger.debug("getMemberGym request recieved");
       const user = req.user;
-      if (!user) {
+      if (!user || !user.memberId) {
         throw new MemberError(MemberErrorCode.UNAUTHORIZED);
       }
-      const gym = await this.memberService.getMemberGym(user.id);
+      this.logger.debug("getMemberGym userId : ", user);
+
+      const gym = await this.memberService.getMemberGym(user.memberId);
       res.status(200).json(gym);
     } catch (error) {
       next(error);
@@ -360,10 +362,10 @@ export class MemberController {
     try {
       this.logger.debug("profile request recieved");
       const user = req.user;
-      this.logger.debug("user: ", user);
       if (!user || !user.memberId) {
         throw new MemberError(MemberErrorCode.UNAUTHORIZED);
       }
+      this.logger.debug("user: ", user.memberId);
       const gym = await this.memberService.profile(user.memberId);
       res.status(200).json(gym);
     } catch (error) {
@@ -381,6 +383,7 @@ export class MemberController {
       if (!user || !user.memberId) {
         throw new MemberError(MemberErrorCode.UNAUTHORIZED);
       }
+      this.logger.debug("user: dashboard", user);
       const gym = await this.memberService.getMemberDashboard(user.memberId);
       res.status(200).json(gym);
     } catch (error) {
