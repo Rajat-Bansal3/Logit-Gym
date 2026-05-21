@@ -114,11 +114,11 @@ model Member {
   height Float?
   age    Int?
 
-  status MemberStatus @default(ACTIVE)
-
-  joinDate  DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status              MemberStatus @default(ACTIVE)
+  attendanceAggregate Int[]        @default([0, 0, 0, 0, 0, 0, 0])
+  joinDate            DateTime     @default(now())
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   membershipHistory Membership[] @relation("MemberToHistory")
 
@@ -179,7 +179,6 @@ model AttendanceLog {
   gym       Gym         @relation(fields: [gymId], references: [id], onDelete: Cascade)
   type      CheckInType
   timestamp DateTime    @default(now())
-  day       String
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
