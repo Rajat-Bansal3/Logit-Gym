@@ -89,6 +89,7 @@ model Gym {
   gymReports       GymReport[]
   gymMetrics       GymMetrics?
 
+  @@unique([isDeleted, ownerId])
   @@map("gyms")
 }
 
