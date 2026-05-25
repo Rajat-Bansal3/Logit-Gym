@@ -158,15 +158,38 @@ export class MemberService {
 			throw new MemberError(MemberErrorCode.NOT_FOUND);
 		}
 
-		if (member.status === "INACTIVE") {
-			throw new MemberError(MemberErrorCode.BAD_REQUEST, "Member is already inactive");
+		await this.memberRepository.updateStatus(memberId, member.status);
+
+		this.logger.debug("status changed success", {
+			memberId,
+			status: member.status,
+		});
+		return {
+			message: "Members status changed successfully",
+			success: true,
+			data: null,
+		};
+	}
+	async deleteMember(
+		memberId: string,
+		gymId: string,
+		__user: AuthenticatedUser,
+	): Promise<BaseResponse<null>> {
+		this.logger.debug("deactivateMember: fetching member", { memberId, gymId });
+
+		const member = await this.memberRepository.findByIdAndGym(memberId, gymId);
+		if (!member) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND);
 		}
 
-		await this.memberRepository.softDelete(memberId);
+		if (member.isDeleted) {
+			throw new MemberError(MemberErrorCode.BAD_REQUEST, "Member is already deleted");
+		}
 
-		this.logger.debug("deactivateMember: success", { memberId });
+		await this.memberRepository.delete(memberId);
+
 		return {
-			message: "Member deactivated successfully",
+			message: "Members deleted successfully",
 			success: true,
 			data: null,
 		};
@@ -249,6 +272,18 @@ export class MemberService {
 			data: attendance,
 		};
 	}
+	async getGymAttendance(gymId: string): Promise<BaseResponse<AttendanceLog[]>> {
+		this.logger.debug("getMemberGym request recieved");
+		const gym = await this.memberRepository.getGymAttendance(gymId);
+		if (!gym) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "gym not found");
+		}
+		return {
+			message: "gym attendances fetched successfully",
+			success: true,
+			data: gym,
+		};
+	}
 	async getMemberGym(memberId: string): Promise<BaseResponse<Gym>> {
 		this.logger.debug("getMemberGym request recieved");
 		const gym = await this.memberRepository.getMemberGym(memberId);
@@ -312,12 +347,12 @@ export class MemberService {
 	}
 	async getGymOccupancy(memberId: string): Promise<BaseResponse<number>> {
 		this.logger.debug("getGymOccupancy request recieved");
-		const [checkIns, checkOuts] = await this.memberRepository.getGymOccupancy(memberId);
+		const [total_members, checkOuts] = await this.memberRepository.getGymOccupancy(memberId);
 
 		return {
 			message: "Occupancy fetched successfully",
 			success: true,
-			data: Math.max(0, checkIns - checkOuts),
+			data: Math.max(0, checkOuts / total_members),
 		};
 	}
 }

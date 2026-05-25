@@ -27,6 +27,7 @@ export const onboardMemberSchema = z.object({
 	planName: z.string().optional(),
 	membershipStartDate: z.coerce.date(),
 	dueAmount: z.number().min(0).default(0),
+	membershipAmount: z.number().min(1).max(1_00_00_000),
 });
 
 const daysEnum = z.enum([

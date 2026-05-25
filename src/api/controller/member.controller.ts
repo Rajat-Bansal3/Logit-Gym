@@ -99,6 +99,24 @@ export class MemberController {
 		}
 	};
 
+	getGymAttendance = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			this.logger.debug("req recieved getGymAttendance");
+			const user = req.user;
+			if (!user || !user.gymId) {
+				throw new MemberError(MemberErrorCode.FORBIDDEN);
+			}
+			const attendances = await this.memberService.getGymAttendance(user.gymId);
+			res.status(200).json(attendances);
+		} catch (error) {
+			this.logger.error("getGymAttendance: error", {
+				gymId: req.params.gymId,
+				error,
+			});
+			next(error);
+		}
+	};
+
 	updateMember = async (req: Request, res: Response, next: NextFunction) => {
 		try {
 			this.logger.debug("updateMember: request received", {
@@ -143,6 +161,33 @@ export class MemberController {
 			}
 
 			const result = await this.memberService.deactivateMember(memberId, gymId, user);
+
+			this.logger.debug("deactivateMember: completed", { gymId, memberId });
+			res.status(200).json(result);
+		} catch (error) {
+			this.logger.error("deactivateMember: error", {
+				gymId: req.params.gymId,
+				memberId: req.params.memberId,
+				error,
+			});
+			next(error);
+		}
+	};
+	deleteMember = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			this.logger.debug("deactivateMember: request received", {
+				gymId: req.params.gymId,
+				memberId: req.params.memberId,
+			});
+
+			const user = req.user;
+			const { gymId, memberId } = req.params;
+
+			if (!user || !gymId || !memberId || Array.isArray(gymId) || Array.isArray(memberId)) {
+				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+			}
+
+			const result = await this.memberService.deleteMember(memberId, gymId, user);
 
 			this.logger.debug("deactivateMember: completed", { gymId, memberId });
 			res.status(200).json(result);
@@ -258,7 +303,7 @@ export class MemberController {
 			if (!user || !user.memberId) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
-			const attendances = this.memberService.getMemberAttendance(user.memberId);
+			const attendances = await this.memberService.getMemberAttendance(user.memberId);
 			res.status(200).json(attendances);
 		} catch (error) {
 			next(error);

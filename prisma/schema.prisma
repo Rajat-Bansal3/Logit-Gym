@@ -116,6 +116,7 @@ model Member {
   age    Int?
 
   status              MemberStatus @default(ACTIVE)
+  isDeleted           Boolean      @default(false)
   attendanceAggregate Int[]        @default([0, 0, 0, 0, 0, 0, 0])
   joinDate            DateTime     @default(now())
   createdAt           DateTime     @default(now())
@@ -151,8 +152,9 @@ model Membership {
   endDate   DateTime?
   isActive  Boolean            @default(true)
 
-  planName  String?
-  dueAmount Float   @default(0)
+  planName         String?
+  dueAmount        Float   @default(0)
+  membershipAmount Float   @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -3,6 +3,7 @@ import {
 	CheckInType,
 	type Member,
 	type MemberMetrics,
+	type MemberStatus,
 	type Membership,
 	type Payment,
 	type Prisma,
@@ -191,8 +192,19 @@ export class MemberRepository {
 					dueAmount: input.dueAmount,
 					isActive: true,
 					...(input.planName !== undefined && { planName: input.planName }),
+					membershipAmount: input.membershipAmount,
 				},
 			});
+			if (input.dueAmount === 0) {
+				await tx.payment.create({
+					data: {
+						amount: input.membershipAmount,
+						gymId,
+						memberId: member.id,
+						membershipId: membership.id,
+					},
+				});
+			}
 
 			const updated = await tx.member.update({
 				where: { id: member.id },
@@ -231,10 +243,34 @@ export class MemberRepository {
 		});
 	}
 
-	async softDelete(memberId: string): Promise<Member> {
-		return this.prisma.member.update({
-			where: { id: memberId },
-			data: { status: "INACTIVE" },
+	async updateStatus(memberId: string, currStatus: MemberStatus): Promise<Member> {
+		switch (currStatus) {
+			case "ACTIVE":
+				return this.prisma.member.update({
+					where: { id: memberId },
+					data: { status: "INACTIVE" },
+				});
+			case "INACTIVE":
+				return this.prisma.member.update({
+					where: { id: memberId },
+					data: { status: "ACTIVE" },
+				});
+
+			default:
+				return this.prisma.member.update({
+					where: { id: memberId },
+					data: {},
+				});
+		}
+	}
+	async delete(memberId: string) {
+		await this.prisma.member.update({
+			where: {
+				id: memberId,
+			},
+			data: {
+				isDeleted: true,
+			},
 		});
 	}
 
@@ -551,11 +587,9 @@ export class MemberRepository {
 		}
 		const gymId = gym.gymId;
 		return await this.prisma.$transaction([
-			this.prisma.attendanceLog.count({
+			this.prisma.member.count({
 				where: {
-					gymId,
-					type: CheckInType.IN,
-					timestamp: { gte: windowStart, lte: now },
+					gymId: gymId,
 				},
 			}),
 			this.prisma.attendanceLog.count({
@@ -566,5 +600,12 @@ export class MemberRepository {
 				},
 			}),
 		]);
+	}
+	async getGymAttendance(gymId: string): Promise<AttendanceLog[]> {
+		return await this.prisma.attendanceLog.findMany({
+			where: {
+				gymId: gymId,
+			},
+		});
 	}
 }
