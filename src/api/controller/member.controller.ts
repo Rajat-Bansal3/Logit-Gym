@@ -7,6 +7,7 @@ import {
 	reportQuerySchema,
 	updateMemberSchema,
 } from "../../shared/types/member.types";
+import { createMembershipSchema } from "../../shared/types/payment.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { MemberService } from "../services/member.services";
@@ -376,6 +377,37 @@ export class MemberController {
 			this.logger.debug("gym: ", gym);
 			res.status(200).json(gym);
 		} catch (error) {
+			next(error);
+		}
+	};
+	getMemberMembership = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			this.logger.debug("getMemberMembership req recieved");
+			const user = req.user;
+			const memberId = req.params.memberId;
+			if (!user || !user.gymId || !memberId || Array.isArray(memberId)) {
+				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
+			}
+			const membership = await this.memberService.getMemberMembership(memberId);
+			res.status(200).json(membership);
+		} catch (error) {
+			this.logger.error("getMemberMembership req errored", error);
+			next(error);
+		}
+	};
+	createMembership = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			this.logger.debug("createMemberMembership req recieved");
+			const user = req.user;
+			const memberId = req.params.memberId;
+			const data = createMembershipSchema.parse(req.body);
+			if (!user || !user.gymId || !memberId || Array.isArray(memberId)) {
+				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
+			}
+			const membership = await this.memberService.createMemberMembership(memberId, data);
+			res.status(200).json(membership);
+		} catch (error) {
+			this.logger.error("getMemberMembership req errored", error);
 			next(error);
 		}
 	};

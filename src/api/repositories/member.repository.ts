@@ -18,6 +18,7 @@ import {
 	type ReportQuery,
 	type UpdateMember,
 } from "../../shared/types/member.types";
+import type { CreateMemberMembershipInput } from "../../shared/types/payment.types";
 import { computeAge, computeMembershipEndDate } from "../../shared/utils/util_functions";
 
 export type MemberWithDetails = Member & {
@@ -606,6 +607,60 @@ export class MemberRepository {
 			where: {
 				gymId: gymId,
 			},
+		});
+	}
+	async getMemberMembership(memberId: string): Promise<
+		Prisma.MembershipGetPayload<{
+			include: {
+				payments: true;
+			};
+		}>[]
+	> {
+		return await this.prisma.membership.findMany({
+			where: {
+				memberId: memberId,
+			},
+			include: {
+				payments: true,
+			},
+		});
+	}
+	async createMemberMembership(memberId: string, data: CreateMemberMembershipInput) {
+		await this.prisma.$transaction(async (tx) => {
+			const curr_membership = await tx.membership.create({
+				data: {
+					memberId: memberId,
+					planType: data.planType,
+					startDate: data.startDate,
+					dueAmount: data.dueAmount,
+					endDate: computeMembershipEndDate(data.startDate, data.planType),
+					membershipAmount: data.membershipAmount,
+				},
+				select: {
+					id: true,
+					member: {
+						select: {
+							gymId: true,
+						},
+					},
+				},
+			});
+			await tx.membership.update({
+				where: {
+					id: data.predecessor,
+				},
+				data: {
+					successorId: curr_membership.id,
+				},
+			});
+			await tx.payment.create({
+				data: {
+					amount: data.membershipAmount,
+					description: "membership payment",
+					memberId: curr_membership.id,
+					gymId: curr_membership.member.gymId,
+				},
+			});
 		});
 	}
 }

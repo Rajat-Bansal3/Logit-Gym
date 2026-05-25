@@ -1,6 +1,11 @@
 import z from "zod";
 import type { Payment, Prisma } from "../../generated/client";
-import { PaymentMethod, PaymentStatus, TransactionType } from "../../generated/enums";
+import {
+	MembershipPlanType,
+	PaymentMethod,
+	PaymentStatus,
+	TransactionType,
+} from "../../generated/enums";
 import type { paginationReturnType } from "./returns";
 
 export const createPaymentSchema = z.object({
@@ -33,3 +38,12 @@ export type GetPaymentsOutput = {
 	payments: Payment[];
 	pagination: paginationReturnType;
 };
+export const createMembershipSchema = z.object({
+	planType: z.enum(MembershipPlanType),
+	startDate: z.coerce.date(),
+	planName: z.string().min(1).max(100),
+	dueAmount: z.coerce.number(),
+	membershipAmount: z.coerce.number(),
+	predecessor: z.string().min(1).max(100),
+});
+export type CreateMemberMembershipInput = z.infer<typeof createMembershipSchema>;

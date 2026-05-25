@@ -37,10 +37,8 @@ router.get("/reports/attendance", roleMiddleware("OWNER"), controller.getAttenda
 // TODO
 router.get("/reports/metrics", roleMiddleware("OWNER"), controller.getMemberMetricsReport);
 
-// router.get("/:memberId/membership");
+router.get("/:memberId/membership", controller.getMemberMembership);
 
-// router.post("/:memberId/membership");
-// router.delete("/:memberId/membership");
-// router.get("/:memberId/membership");
+router.post("/:memberId/membership", roleMiddleware("OWNER"), controller.createMembership);
 
 export default router;

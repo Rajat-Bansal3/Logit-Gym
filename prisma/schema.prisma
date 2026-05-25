@@ -221,15 +221,15 @@ model Payment {
   id           String        @id @default(cuid())
   memberId     String
   member       Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  membershipId String
-  membership   Membership    @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membershipId String?
+  membership   Membership?   @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   gymId        String
   gym          Gym           @relation(fields: [gymId], references: [id], onDelete: Cascade)
   amount       Float
   dueDate      DateTime?
   paidDate     DateTime?
   description  String?
-  status       PaymentStatus @default(PENDING)
+  status       PaymentStatus @default(SUCCESS)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 

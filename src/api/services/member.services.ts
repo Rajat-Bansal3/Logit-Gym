@@ -1,8 +1,10 @@
+import type { CreateMemberMembershipInput } from "@/shared/types/payment.types";
 import type {
 	AttendanceLog,
 	CheckInType,
 	Gym,
 	Payment,
+	Prisma,
 	PrismaClient,
 } from "../../generated/client";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
@@ -353,6 +355,32 @@ export class MemberService {
 			message: "Occupancy fetched successfully",
 			success: true,
 			data: Math.max(0, checkOuts / total_members),
+		};
+	}
+	async getMemberMembership(memberId: string): Promise<
+		BaseResponse<
+			Prisma.MembershipGetPayload<{
+				include: {
+					payments: true;
+				};
+			}>[]
+		>
+	> {
+		const membership = await this.memberRepository.getMemberMembership(memberId);
+		return {
+			message: "memberships fetched successfully",
+			success: true,
+			data: membership,
+		};
+	}
+	async createMemberMembership(
+		memberId: string,
+		data: CreateMemberMembershipInput,
+	): Promise<BaseResponse<null>> {
+		await this.memberRepository.createMemberMembership(memberId, data);
+		return {
+			message: "memberships create successfully",
+			success: true,
 		};
 	}
 }
