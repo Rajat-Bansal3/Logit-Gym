@@ -51,6 +51,7 @@ export const updateMemberSchema = z.object({
 	weight: z.number().positive().nullable().optional(),
 	height: z.number().positive().nullable().optional(),
 	status: z.enum(MemberStatus).optional(),
+	dateOfBirth: z.coerce.date(),
 });
 
 export const listMembersQuerySchema = z.object({

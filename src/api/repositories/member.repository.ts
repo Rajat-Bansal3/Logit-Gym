@@ -239,6 +239,7 @@ export class MemberRepository {
 				}),
 				...(input.weight !== undefined && { weight: input.weight ?? null }),
 				...(input.height !== undefined && { height: input.height ?? null }),
+				age: computeAge(input.dateOfBirth),
 			},
 			include: memberWithDetails,
 		});
