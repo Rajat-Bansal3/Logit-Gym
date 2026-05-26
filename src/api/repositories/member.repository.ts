@@ -104,6 +104,15 @@ export type MemberDashboardOut = {
 	due_amount: number;
 	activity_graph: number[];
 };
+export type MemberAttendanceOut = Prisma.AttendanceLogGetPayload<{
+	include: {
+		member: {
+			select: {
+				name: true;
+			};
+		};
+	};
+}>[];
 
 export class MemberRepository {
 	constructor(private readonly prisma: PrismaClient) {}
@@ -496,19 +505,19 @@ export class MemberRepository {
 			churnRisk,
 		};
 	}
-	async getMemberattendance(memberId: string): Promise<AttendanceLog[]> {
-		return (
-			(
-				await this.prisma.member.findUnique({
-					where: {
-						id: memberId,
+	async getMemberattendance(memberId: string): Promise<MemberAttendanceOut> {
+		return await this.prisma.attendanceLog.findMany({
+			where: {
+				memberId: memberId,
+			},
+			include: {
+				member: {
+					select: {
+						name: true,
 					},
-					include: {
-						attendanceLogs: true,
-					},
-				})
-			)?.attendanceLogs ?? []
-		);
+				},
+			},
+		});
 	}
 	async getMemberGym(memberId: string): Promise<Prisma.GymGetPayload<{
 		include: {
@@ -658,7 +667,7 @@ export class MemberRepository {
 				data: {
 					amount: data.membershipAmount,
 					description: "membership payment",
-					memberId: curr_membership.id,
+					memberId: memberId,
 					gymId: curr_membership.member.gymId,
 				},
 			});

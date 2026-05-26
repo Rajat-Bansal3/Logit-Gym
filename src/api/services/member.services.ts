@@ -22,6 +22,7 @@ import { client } from "../../shared/utils/prisma";
 import {
 	type AttendanceReport,
 	type GymOverviewReport,
+	type MemberAttendanceOut,
 	type MemberDashboardOut,
 	type MemberIncludingUser,
 	type MemberListResult,
@@ -265,7 +266,7 @@ export class MemberService {
 			data: report,
 		};
 	}
-	async getMemberAttendance(memberId: string): Promise<BaseResponse<AttendanceLog[]>> {
+	async getMemberAttendance(memberId: string): Promise<BaseResponse<MemberAttendanceOut>> {
 		this.logger.debug("getMemberattendance completed", memberId);
 		const attendance = await this.memberRepository.getMemberattendance(memberId);
 		return {
