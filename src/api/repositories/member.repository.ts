@@ -612,10 +612,26 @@ export class MemberRepository {
 			}),
 		]);
 	}
-	async getGymAttendance(gymId: string): Promise<AttendanceLog[]> {
+	async getGymAttendance(gymId: string, date: Date): Promise<MemberAttendanceOut> {
+		const startOfDay = new Date(date);
+		startOfDay.setUTCHours(0, 0, 0, 0);
+
+		const endOfDay = new Date(date);
+		endOfDay.setUTCHours(23, 59, 59, 999);
 		return await this.prisma.attendanceLog.findMany({
 			where: {
 				gymId: gymId,
+				createdAt: {
+					gte: startOfDay,
+					lte: endOfDay,
+				},
+			},
+			include: {
+				member: {
+					select: {
+						name: true,
+					},
+				},
 			},
 		});
 	}

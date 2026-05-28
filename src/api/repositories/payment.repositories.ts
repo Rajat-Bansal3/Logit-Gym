@@ -66,7 +66,7 @@ export class PaymentRepository {
 		return { id: result };
 	};
 	getPayments = async (
-		_gymId: string,
+		gymId: string,
 		{
 			page = 1,
 			limit = 10,
@@ -81,12 +81,17 @@ export class PaymentRepository {
 			memberId: string | undefined;
 		},
 	): Promise<GetPaymentsOutput> => {
-		const total = await client.payment.count();
+		const total = await client.payment.count({
+			where: {
+				gymId: gymId,
+			},
+		});
 		const payments = await client.payment.findMany({
 			where: {
 				...(startDate && { paidDate: startDate }),
 				...(endDate && { dueDate: endDate }),
 				...(memberId && { memberId: memberId }),
+				gymId: gymId,
 			},
 			skip: limit * (page - 1),
 			take: limit,

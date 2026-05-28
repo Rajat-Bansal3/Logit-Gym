@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import z from "zod";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import {
 	listMembersQuerySchema,
@@ -104,10 +105,15 @@ export class MemberController {
 		try {
 			this.logger.debug("req recieved getGymAttendance");
 			const user = req.user;
+			const dateQuery =
+				req.query.date && !Array.isArray(req.query.date)
+					? String(req.query.date)
+					: new Date().toISOString();
+			const date = z.coerce.date().parse(dateQuery);
 			if (!user || !user.gymId) {
 				throw new MemberError(MemberErrorCode.FORBIDDEN);
 			}
-			const attendances = await this.memberService.getGymAttendance(user.gymId);
+			const attendances = await this.memberService.getGymAttendance(user.gymId, date);
 			res.status(200).json(attendances);
 		} catch (error) {
 			this.logger.error("getGymAttendance: error", {

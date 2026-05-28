@@ -1,12 +1,5 @@
 import type { CreateMemberMembershipInput } from "@/shared/types/payment.types";
-import type {
-	AttendanceLog,
-	CheckInType,
-	Gym,
-	Payment,
-	Prisma,
-	PrismaClient,
-} from "../../generated/client";
+import type { CheckInType, Gym, Payment, Prisma, PrismaClient } from "../../generated/client";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
 import type {
@@ -275,9 +268,9 @@ export class MemberService {
 			data: attendance,
 		};
 	}
-	async getGymAttendance(gymId: string): Promise<BaseResponse<AttendanceLog[]>> {
+	async getGymAttendance(gymId: string, date: Date): Promise<BaseResponse<MemberAttendanceOut>> {
 		this.logger.debug("getMemberGym request recieved");
-		const gym = await this.memberRepository.getGymAttendance(gymId);
+		const gym = await this.memberRepository.getGymAttendance(gymId, date);
 		if (!gym) {
 			throw new MemberError(MemberErrorCode.NOT_FOUND, "gym not found");
 		}
