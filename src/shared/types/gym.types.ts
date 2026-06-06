@@ -36,5 +36,12 @@ export const updateGymSchema = z.object({
 		.optional(),
 });
 
+export const addMachineSchema = z.object({
+	serialNumber: z.string().min(1).max(100),
+	machineName: z.string().min(1).max(100),
+	api_key: z.string().min(1).max(100),
+});
+
 export type UpdateGym = z.infer<typeof updateGymSchema>;
 export type CreateGym = z.infer<typeof createGymSchema>;
+export type AddMachine = z.infer<typeof addMachineSchema>;

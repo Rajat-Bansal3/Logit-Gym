@@ -6,6 +6,7 @@ import {
 	PaymentStatus,
 	TransactionType,
 } from "../../generated/enums";
+import { machineDataSchema } from "./machine.types";
 import type { paginationReturnType } from "./returns";
 
 export const createPaymentSchema = z.object({
@@ -46,4 +47,7 @@ export const createMembershipSchema = z.object({
 	membershipAmount: z.coerce.number(),
 	predecessor: z.string().min(1).max(100),
 });
+export const createMemberShipWithMachine = createMembershipSchema.extend(machineDataSchema.shape);
+
+export type CreateMemberMembershipWithMachineInput = z.infer<typeof createMemberShipWithMachine>;
 export type CreateMemberMembershipInput = z.infer<typeof createMembershipSchema>;

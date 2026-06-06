@@ -1,4 +1,3 @@
-import type { CreateMemberMembershipInput } from "@/shared/types/payment.types";
 import type { CheckInType, Gym, Payment, Prisma, PrismaClient } from "../../generated/client";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
@@ -9,9 +8,11 @@ import type {
 	ReportQuery,
 	UpdateMember,
 } from "../../shared/types/member.types";
+import type { CreateMemberMembershipWithMachineInput } from "../../shared/types/payment.types";
 import type { BaseResponse } from "../../shared/types/returns";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
+import { MachineRepository } from "../repositories/machine.repository";
 import {
 	type AttendanceReport,
 	type GymOverviewReport,
@@ -26,11 +27,13 @@ import {
 
 export class MemberService {
 	private readonly memberRepository: MemberRepository;
+	private readonly machineRepository: MachineRepository;
 	private readonly logger: AppLogger;
 
 	constructor({ prisma = client }: { prisma: PrismaClient }) {
 		this.memberRepository = new MemberRepository(prisma);
 		this.logger = new AppLogger();
+		this.machineRepository = new MachineRepository(prisma);
 	}
 
 	async onboardMember(
@@ -56,6 +59,28 @@ export class MemberService {
 		}
 
 		const member = await this.memberRepository.create(gymId, data);
+
+		if (data.isMachined) {
+			await this.machineRepository.addUser({
+				memberName: member.name,
+				biometricCode: member.biometricCode,
+				apiKey: data.apiKey,
+				serialNumber: data.serialNumber,
+				cardNumber: data.cardNumber,
+				IsBioPasswordUpload: data.IsBioPasswordUpload ?? false,
+				IsCardUpload: data.IsCardUpload ?? false,
+				IsFaceUpload: data.IsFaceUpload ?? false,
+				IsFPUpload: data.IsFPUpload ?? false,
+			});
+			if (member.currentMembership?.endDate) {
+				await this.machineRepository.setUserExpiration({
+					apiKey: data.apiKey,
+					biometricCode: member.biometricCode,
+					expirationDate: member.currentMembership?.endDate,
+					serialNumber: data.serialNumber,
+				});
+			}
+		}
 
 		this.logger.debug("onboardMember: success", { memberId: member.id });
 		return {
@@ -145,6 +170,9 @@ export class MemberService {
 	async deactivateMember(
 		memberId: string,
 		gymId: string,
+		apiKey: string,
+		serialNumber: string,
+		isMachine: boolean,
 		__user: AuthenticatedUser,
 	): Promise<BaseResponse<null>> {
 		this.logger.debug("deactivateMember: fetching member", { memberId, gymId });
@@ -154,12 +182,24 @@ export class MemberService {
 			throw new MemberError(MemberErrorCode.NOT_FOUND);
 		}
 
-		await this.memberRepository.updateStatus(memberId, member.status);
+		const newStatus = member.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+
+		await this.memberRepository.updateStatus(memberId, newStatus);
+
+		if (isMachine) {
+			await this.machineRepository.toggleUserBlock({
+				apiKey,
+				serialNumber,
+				biometricCode: member.biometricCode,
+				block: newStatus === "INACTIVE",
+			});
+		}
 
 		this.logger.debug("status changed success", {
 			memberId,
-			status: member.status,
+			status: newStatus,
 		});
+
 		return {
 			message: "Members status changed successfully",
 			success: true,
@@ -169,6 +209,9 @@ export class MemberService {
 	async deleteMember(
 		memberId: string,
 		gymId: string,
+		apiKey: string,
+		serialNumber: string,
+		isMachine: boolean,
 		__user: AuthenticatedUser,
 	): Promise<BaseResponse<null>> {
 		this.logger.debug("deactivateMember: fetching member", { memberId, gymId });
@@ -183,6 +226,14 @@ export class MemberService {
 		}
 
 		await this.memberRepository.delete(memberId);
+
+		if (isMachine) {
+			await this.machineRepository.removeUser({
+				apiKey,
+				serialNumber,
+				biometricCode: member.biometricCode,
+			});
+		}
 
 		return {
 			message: "Members deleted successfully",
@@ -369,9 +420,17 @@ export class MemberService {
 	}
 	async createMemberMembership(
 		memberId: string,
-		data: CreateMemberMembershipInput,
+		data: CreateMemberMembershipWithMachineInput,
 	): Promise<BaseResponse<null>> {
-		await this.memberRepository.createMemberMembership(memberId, data);
+		const membership = await this.memberRepository.createMemberMembership(memberId, data);
+		if (data.isMachine && membership.endDate) {
+			await this.machineRepository.setUserExpiration({
+				apiKey: data.apiKey,
+				biometricCode: membership.member.biometricCode,
+				expirationDate: membership.endDate,
+				serialNumber: data.serialNumber,
+			});
+		}
 		return {
 			message: "memberships create successfully",
 			success: true,

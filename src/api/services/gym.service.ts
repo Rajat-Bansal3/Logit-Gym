@@ -1,19 +1,22 @@
 import type { PrismaClient } from "../../generated/client";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
-import type { CreateGym, UpdateGym } from "../../shared/types/gym.types";
+import type { AddMachine, CreateGym, UpdateGym } from "../../shared/types/gym.types";
 import type { BaseResponse } from "../../shared/types/returns";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { GymRepository, type gym_with_profile } from "../repositories/gym.repository";
+import { MachineRepository } from "../repositories/machine.repository";
 
 export class GymService {
 	private gymRepository: GymRepository;
 	private logger: AppLogger;
+	private machineRepository: MachineRepository;
 
 	constructor({ prisma = client }: { prisma: PrismaClient }) {
 		this.gymRepository = new GymRepository(prisma);
 		this.logger = new AppLogger();
+		this.machineRepository = new MachineRepository(prisma);
 	}
 
 	async createGym(
@@ -144,6 +147,30 @@ export class GymService {
 		};
 	}
 
+	async addMachine(data: AddMachine, gymId: string): Promise<BaseResponse<null>> {
+		const resp = await this.machineRepository.addMachine({
+			apiKey: data.api_key,
+			gymId: gymId,
+			machinename: data.machineName,
+			serialNumber: data.serialNumber,
+		});
+		return {
+			message: resp,
+			success: true,
+		};
+	}
+	async removeMachine(data: AddMachine): Promise<BaseResponse<null>> {
+		const resp = await this.machineRepository.removeMachine({
+			apiKey: data.api_key,
+			serialNumber: data.serialNumber,
+		});
+		return {
+			message: resp,
+			success: true,
+		};
+	}
+
+	//private methods
 	private async canAccessGym(
 		gym: any,
 		user: AuthenticatedUser,

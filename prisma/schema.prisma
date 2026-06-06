@@ -87,16 +87,31 @@ model Gym {
   weeklyActivities WeeklyActivity[]
   hourlyTraffic    HourlyTraffic[]
   gymReports       GymReport[]
+  machines         Machines[]
   gymMetrics       GymMetrics?
 
   @@unique([isDeleted, ownerId])
   @@map("gyms")
 }
 
+model Machines {
+  id           String @id @default(cuid())
+  name         String
+  serialNumber String @unique
+
+  gym   Gym?    @relation(fields: [gymId], references: [id])
+  gymId String?
+
+  @@index([serialNumber])
+  @@index([name])
+  @@map("machines")
+}
+
 model Member {
-  id     String  @id @default(cuid())
-  userId String? @unique
-  user   User?   @relation(fields: [userId], references: [id])
+  id            String  @id @default(cuid())
+  userId        String? @unique
+  biometricCode Int     @default(autoincrement())
+  user          User?   @relation(fields: [userId], references: [id])
 
   gymId String
   gym   Gym    @relation(fields: [gymId], references: [id])

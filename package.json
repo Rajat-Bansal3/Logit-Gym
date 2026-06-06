@@ -28,6 +28,7 @@
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "argon": "^2.0.21",
+    "axios": "^1.17.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "helmet": "^8.1.0",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.13",
+    "@types/axios": "^0.14.4",
     "@types/bcryptjs": "^3.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

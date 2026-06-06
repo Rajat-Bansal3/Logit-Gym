@@ -1,14 +1,16 @@
 import type { NextFunction, Request, Response } from "express";
 import z from "zod";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
+import { machineDataSchema } from "../../shared/types/machine.types";
 import {
+	deleteMemberSchema,
 	listMembersQuerySchema,
 	markAttendanceSchema,
 	onboardMemberSchema,
 	reportQuerySchema,
 	updateMemberSchema,
 } from "../../shared/types/member.types";
-import { createMembershipSchema } from "../../shared/types/payment.types";
+import { createMemberShipWithMachine } from "../../shared/types/payment.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { MemberService } from "../services/member.services";
@@ -166,8 +168,16 @@ export class MemberController {
 			if (!user || !gymId || !memberId || Array.isArray(gymId) || Array.isArray(memberId)) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
+			const machineData = machineDataSchema.parse(req.body);
 
-			const result = await this.memberService.deactivateMember(memberId, gymId, user);
+			const result = await this.memberService.deactivateMember(
+				memberId,
+				gymId,
+				machineData.apiKey,
+				machineData.serialNumber,
+				machineData.isMachine,
+				user,
+			);
 
 			this.logger.debug("deactivateMember: completed", { gymId, memberId });
 			res.status(200).json(result);
@@ -188,15 +198,26 @@ export class MemberController {
 			});
 
 			const user = req.user;
-			const { gymId, memberId } = req.params;
-
-			if (!user || !gymId || !memberId || Array.isArray(gymId) || Array.isArray(memberId)) {
+			const { gymId } = req.params;
+			if (!user || !gymId || Array.isArray(gymId)) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 
-			const result = await this.memberService.deleteMember(memberId, gymId, user);
+			const data = deleteMemberSchema.parse(req.body);
 
-			this.logger.debug("deactivateMember: completed", { gymId, memberId });
+			const result = await this.memberService.deleteMember(
+				data.memberId,
+				gymId,
+				data.apiKey,
+				data.serialNumber,
+				data.isMachine,
+				user,
+			);
+
+			this.logger.debug("deactivateMember: completed", {
+				gymId,
+				memberId: data.memberId,
+			});
 			res.status(200).json(result);
 		} catch (error) {
 			this.logger.error("deactivateMember: error", {
@@ -406,7 +427,7 @@ export class MemberController {
 			this.logger.debug("createMemberMembership req recieved");
 			const user = req.user;
 			const memberId = req.params.memberId;
-			const data = createMembershipSchema.parse(req.body);
+			const data = createMemberShipWithMachine.parse(req.body);
 			if (!user || !user.gymId || !memberId || Array.isArray(memberId)) {
 				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
 			}

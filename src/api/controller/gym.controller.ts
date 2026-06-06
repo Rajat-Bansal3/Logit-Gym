@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
-import { createGymSchema, updateGymSchema } from "../../shared/types/gym.types";
+import { addMachineSchema, createGymSchema, updateGymSchema } from "../../shared/types/gym.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { GymService } from "../services/gym.service";
@@ -86,6 +86,42 @@ export class GymController {
 		} catch (error) {
 			this.logger.error("deleteGym: error", { gymId: req.params.id, error });
 			next(error);
+		}
+	};
+	addMachine = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user || !user.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
+			}
+			const data = addMachineSchema.parse(req.body);
+			const resp = await this.gymService.addMachine(data, user.gymId);
+			return res.status(200).json(resp);
+		} catch (error) {
+			this.logger.error("add machine: error", {
+				gymId: req.user?.gymId,
+				error,
+			});
+			next(error);
+			return;
+		}
+	};
+	removeMachine = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user || !user.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
+			}
+			const data = addMachineSchema.parse(req.body);
+			const resp = await this.gymService.removeMachine(data);
+			return res.status(200).json(resp);
+		} catch (error) {
+			this.logger.error("add machine: error", {
+				gymId: req.user?.gymId,
+				error,
+			});
+			next(error);
+			return;
 		}
 	};
 }

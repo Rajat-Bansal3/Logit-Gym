@@ -652,7 +652,7 @@ export class MemberRepository {
 		});
 	}
 	async createMemberMembership(memberId: string, data: CreateMemberMembershipInput) {
-		await this.prisma.$transaction(async (tx) => {
+		const curr_membership = await this.prisma.$transaction(async (tx) => {
 			const curr_membership = await tx.membership.create({
 				data: {
 					memberId: memberId,
@@ -664,9 +664,11 @@ export class MemberRepository {
 				},
 				select: {
 					id: true,
+					endDate: true,
 					member: {
 						select: {
 							gymId: true,
+							biometricCode: true,
 						},
 					},
 				},
@@ -687,6 +689,8 @@ export class MemberRepository {
 					gymId: curr_membership.member.gymId,
 				},
 			});
+			return curr_membership;
 		});
+		return curr_membership;
 	}
 }

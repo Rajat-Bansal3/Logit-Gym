@@ -10,7 +10,6 @@ const gymController = new GymController();
 
 router.use(authMiddleware);
 router.use("/:gymId/members", memberRouter);
-
 /**
  * Create a new gym
  */
@@ -30,5 +29,11 @@ router.patch("/:id", roleMiddleware("OWNER"), catchAsync(gymController.updateGym
  * Delete a gym
  */
 router.delete("/:id", roleMiddleware("OWNER"), catchAsync(gymController.deleteGym));
+/**
+ * add a new machine
+ */
+router.post("/add-machine", roleMiddleware("OWNER"), catchAsync(gymController.addMachine));
+
+router.delete("/delete-machine", roleMiddleware("OWNER"), catchAsync(gymController.deleteGym));
 
 export default router;
