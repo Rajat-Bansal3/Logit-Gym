@@ -63,13 +63,14 @@ export class MachineRepository {
 		serialNumber: string;
 		apiKey: string;
 	}): Promise<string> {
-		// try {
-		// 	await this.prisma.machines.delete({
-		// 		where: { serialNumber },
-		// 	});
-		// } catch (_error) {
-		// 	throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
-		// }
+		try {
+			await this.prisma.machines.delete({
+				where: { serialNumber },
+			});
+		} catch (error) {
+			console.log(error);
+			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
+		}
 
 		try {
 			const res = await axios.get(`${env.MACHINE_SERVER}/DeleteBiometric`, {
@@ -88,6 +89,7 @@ export class MachineRepository {
 			//   );
 			return res.data;
 		} catch (error) {
+			console.log(error);
 			if (axios.isAxiosError(error)) {
 				if (!error.response) {
 					throw new MachineError(MachineErrorCode.API_UNREACHABLE);

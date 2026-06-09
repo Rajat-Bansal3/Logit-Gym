@@ -116,7 +116,7 @@ export class GymController {
 			const resp = await this.gymService.removeMachine(data);
 			return res.status(200).json(resp);
 		} catch (error) {
-			this.logger.error("add machine: error", {
+			this.logger.error("remove machine: error", {
 				gymId: req.user?.gymId,
 				error,
 			});
