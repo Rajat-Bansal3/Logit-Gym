@@ -63,22 +63,29 @@ export class MachineRepository {
 		serialNumber: string;
 		apiKey: string;
 	}): Promise<string> {
-		try {
-			await this.prisma.machines.delete({
-				where: { serialNumber },
-			});
-		} catch (_error) {
-			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
-		}
+		// try {
+		// 	await this.prisma.machines.delete({
+		// 		where: { serialNumber },
+		// 	});
+		// } catch (_error) {
+		// 	throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
+		// }
 
 		try {
-			const res = await axios.post(`${env.MACHINE_SERVER}/DeleteBiometric`, null, {
+			const res = await axios.get(`${env.MACHINE_SERVER}/DeleteBiometric`, {
 				params: {
 					APIKey: apiKey,
 					SerialNumber: serialNumber,
 				},
 				timeout: 5000,
 			});
+			//    const res = await axios.post(
+			//     `${env.MACHINE_SERVER}/DeleteBiometric?APIKey=${apiKey}&SerialNumber=${serialNumber}`,
+			//     null,
+			//     {
+			//       timeout: 5000,
+			//     },
+			//   );
 			return res.data;
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
@@ -86,12 +93,12 @@ export class MachineRepository {
 					throw new MachineError(MachineErrorCode.API_UNREACHABLE);
 				}
 				if (error.response.status < 500) {
-					throw new MachineError(MachineErrorCode.API_REJECTED);
+					throw new MachineError(MachineErrorCode.API_REJECTED, JSON.stringify(error));
 				}
-				throw new MachineError(MachineErrorCode.API_SERVER_ERROR);
+				throw new MachineError(MachineErrorCode.API_SERVER_ERROR, JSON.stringify(error));
 			}
 
-			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
+			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR, JSON.stringify(error));
 		}
 	}
 

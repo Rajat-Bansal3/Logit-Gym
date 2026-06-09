@@ -25,6 +25,8 @@ router.get("/:id", roleMiddleware("OWNER"), catchAsync(gymController.getGym));
  */
 router.patch("/:id", roleMiddleware("OWNER"), catchAsync(gymController.updateGym));
 
+router.delete("/delete-machine", roleMiddleware("OWNER"), catchAsync(gymController.removeMachine));
+
 /**
  * Delete a gym
  */
@@ -33,7 +35,5 @@ router.delete("/:id", roleMiddleware("OWNER"), catchAsync(gymController.deleteGy
  * add a new machine
  */
 router.post("/add-machine", roleMiddleware("OWNER"), catchAsync(gymController.addMachine));
-
-router.delete("/delete-machine", roleMiddleware("OWNER"), catchAsync(gymController.deleteGym));
 
 export default router;
