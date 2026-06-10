@@ -126,24 +126,24 @@ export class MachineRepository {
 		IsBioPasswordUpload: boolean;
 	}): Promise<string> {
 		try {
-			const res = await axios.post(
-				`${env.MACHINE_SERVER}/AddUserFromApp`,
-				{
+			const res = await axios.post(`${env.MACHINE_SERVER}/UploadUser`, null, {
+				params: {
 					APIKey: apiKey,
 					EmployeeName: memberName,
 					EmployeeCode: biometricCode.toString(),
 					CardNumber: cardNumber,
-					SerialNumber: serialNumber,
+					SerialNumbers: serialNumber,
 					VerifyMode: "face+card",
 					IsFaceUpload,
 					IsFPUpload,
 					IsCardUpload,
 					IsBioPasswordUpload,
 				},
-				{
-					timeout: 5000,
+				timeout: 5000,
+				headers: {
+					"Content-Type": "application/json",
 				},
-			);
+			});
 			return res.data;
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
@@ -151,7 +151,7 @@ export class MachineRepository {
 					throw new MachineError(MachineErrorCode.API_UNREACHABLE);
 				}
 				if (error.response.status < 500) {
-					throw new MachineError(MachineErrorCode.API_REJECTED);
+					throw new MachineError(MachineErrorCode.API_REJECTED, JSON.stringify(error));
 				}
 				throw new MachineError(MachineErrorCode.API_SERVER_ERROR);
 			}
