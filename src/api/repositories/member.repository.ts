@@ -36,6 +36,11 @@ export type MemberListResult = {
 const memberWithDetails = {
 	currentMembership: true,
 	memberMetrics: true,
+	memberMachines: {
+		include: {
+			machine: true,
+		},
+	},
 } satisfies Prisma.MemberInclude;
 
 export type GymOverviewReport = {
