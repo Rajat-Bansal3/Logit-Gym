@@ -69,7 +69,7 @@ export const deleteMemberSchema = z.object({
 export const listMembersQuerySchema = z.object({
 	status: z.enum(MemberStatus).optional(),
 	serialNumber: z.string().min(1).max(100),
-	isMachine: z.boolean().default(false),
+	isMachine: z.coerce.boolean().default(false),
 	search: z.string().optional(),
 	page: z.coerce.number().min(1).default(1),
 	limit: z.coerce.number().min(1).max(100).default(20),
