@@ -1,3 +1,4 @@
+import { env } from "../../env";
 import type { CheckInType, Gym, Payment, Prisma, PrismaClient } from "../../generated/client";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
@@ -60,12 +61,12 @@ export class MemberService {
 
 		const member = await this.memberRepository.create(gymId, data);
 
-		if (data.isMachined) {
+		if (data.isMachine) {
 			await this.machineRepository.addUser({
 				memberName: member.name,
 				biometricCode: member.biometricCode,
-				apiKey: data.apiKey,
-				serialNumber: data.serialNumber,
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				serialNumbers: data.serialNumbers,
 				cardNumber: data.cardNumber,
 				IsBioPasswordUpload: data.IsBioPasswordUpload ?? false,
 				IsCardUpload: data.IsCardUpload ?? false,
@@ -74,10 +75,10 @@ export class MemberService {
 			});
 			if (member.currentMembership?.endDate) {
 				await this.machineRepository.setUserExpiration({
-					apiKey: data.apiKey,
+					apiKey: env.MACHINE_SERVER_API_KEY,
 					biometricCode: member.biometricCode,
 					expirationDate: member.currentMembership?.endDate,
-					serialNumber: data.serialNumber,
+					serialNumbers: data.serialNumbers,
 				});
 			}
 		}
@@ -170,8 +171,7 @@ export class MemberService {
 	async deactivateMember(
 		memberId: string,
 		gymId: string,
-		apiKey: string,
-		serialNumber: string,
+		serialNumbers: string[],
 		isMachine: boolean,
 		__user: AuthenticatedUser,
 	): Promise<BaseResponse<null>> {
@@ -188,8 +188,8 @@ export class MemberService {
 
 		if (isMachine) {
 			await this.machineRepository.toggleUserBlock({
-				apiKey,
-				serialNumber,
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				serialNumbers,
 				biometricCode: member.biometricCode,
 				block: newStatus === "INACTIVE",
 			});
@@ -209,8 +209,7 @@ export class MemberService {
 	async deleteMember(
 		memberId: string,
 		gymId: string,
-		apiKey: string,
-		serialNumber: string,
+		serialNumbers: string[],
 		isMachine: boolean,
 		__user: AuthenticatedUser,
 	): Promise<BaseResponse<null>> {
@@ -229,8 +228,8 @@ export class MemberService {
 
 		if (isMachine) {
 			await this.machineRepository.removeUser({
-				apiKey,
-				serialNumber,
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				serialNumbers,
 				biometricCode: member.biometricCode,
 			});
 		}
@@ -425,10 +424,10 @@ export class MemberService {
 		const membership = await this.memberRepository.createMemberMembership(memberId, data);
 		if (data.isMachine && membership.endDate) {
 			await this.machineRepository.setUserExpiration({
-				apiKey: data.apiKey,
+				apiKey: env.MACHINE_SERVER_API_KEY,
 				biometricCode: membership.member.biometricCode,
 				expirationDate: membership.endDate,
-				serialNumber: data.serialNumber,
+				serialNumbers: data.serialNumber,
 			});
 		}
 		return {

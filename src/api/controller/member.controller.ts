@@ -173,7 +173,6 @@ export class MemberController {
 			const result = await this.memberService.deactivateMember(
 				memberId,
 				gymId,
-				machineData.apiKey,
 				machineData.serialNumber,
 				machineData.isMachine,
 				user,
@@ -208,8 +207,7 @@ export class MemberController {
 			const result = await this.memberService.deleteMember(
 				data.memberId,
 				gymId,
-				data.apiKey,
-				data.serialNumber,
+				data.serialNumbers,
 				data.isMachine,
 				user,
 			);

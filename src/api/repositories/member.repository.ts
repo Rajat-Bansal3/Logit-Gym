@@ -141,7 +141,7 @@ export class MemberRepository {
 	}
 
 	async listByGym(gymId: string, query: ListMembersQuery): Promise<MemberListResult> {
-		const { status, search, page, limit } = query;
+		const { status, search, page, limit, isMachine, serialNumber } = query;
 		const skip = (page - 1) * limit;
 
 		const where: Prisma.MemberWhereInput = {
@@ -154,6 +154,14 @@ export class MemberRepository {
 					{ email: { contains: search, mode: "insensitive" } },
 				],
 			}),
+			...(isMachine === true &&
+				serialNumber !== undefined && {
+					memberMachines: {
+						some: {
+							machine: { serialNumber },
+						},
+					},
+				}),
 		};
 
 		const [members, total] = await this.prisma.$transaction([
@@ -192,7 +200,22 @@ export class MemberRepository {
 					...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
 				},
 			});
+			if (input.isMachine && input.serialNumbers?.length > 0) {
+				const machines = await tx.machines.findMany({
+					where: {
+						serialNumber: { in: input.serialNumbers },
+						gymId,
+					},
+					select: { id: true },
+				});
 
+				await tx.memberMachine.createMany({
+					data: machines.map((machine) => ({
+						memberId: member.id,
+						machineId: machine.id,
+					})),
+				});
+			}
 			const membership = await tx.membership.create({
 				data: {
 					memberId: member.id,

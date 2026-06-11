@@ -107,7 +107,7 @@ export class MachineRepository {
 	async addUser({
 		cardNumber,
 		apiKey,
-		serialNumber,
+		serialNumbers,
 		memberName,
 		biometricCode,
 		IsBioPasswordUpload,
@@ -116,7 +116,7 @@ export class MachineRepository {
 		IsFPUpload,
 	}: {
 		apiKey: string;
-		serialNumber: string;
+		serialNumbers: string[];
 		memberName: string;
 		biometricCode: number;
 		cardNumber: string;
@@ -126,25 +126,44 @@ export class MachineRepository {
 		IsBioPasswordUpload: boolean;
 	}): Promise<string> {
 		try {
-			const res = await axios.post(`${env.MACHINE_SERVER}/UploadUser`, null, {
-				params: {
-					APIKey: apiKey,
-					EmployeeName: memberName,
-					EmployeeCode: biometricCode.toString(),
-					CardNumber: cardNumber,
-					SerialNumbers: serialNumber,
-					VerifyMode: "face+card",
-					IsFaceUpload,
-					IsFPUpload,
-					IsCardUpload,
-					IsBioPasswordUpload,
-				},
-				timeout: 5000,
-				headers: {
-					"Content-Type": "application/json",
-				},
-			});
-			return res.data;
+			const results = await Promise.allSettled(
+				serialNumbers.map((s_no) =>
+					axios.post(`${env.MACHINE_SERVER}/UploadUser`, null, {
+						params: {
+							APIKey: apiKey,
+							EmployeeName: memberName,
+							EmployeeCode: biometricCode.toString(),
+							CardNumber: cardNumber,
+							SerialNumbers: s_no,
+							VerifyMode: "face+card",
+							IsFaceUpload,
+							IsFPUpload,
+							IsCardUpload,
+							IsBioPasswordUpload,
+						},
+						timeout: 5000,
+						headers: {
+							"Content-Type": "application/json",
+						},
+					}),
+				),
+			);
+			const failed = results
+				.map((result, index) => ({
+					result,
+					serialNumber: serialNumbers[index],
+				}))
+				.filter(({ result }) => result.status === "rejected");
+
+			if (failed.length > 0) {
+				const failedSerials = failed.map(({ serialNumber }) => serialNumber).join(", ");
+
+				throw new MachineError(
+					MachineErrorCode.API_REJECTED,
+					`Failed to register on ${failed.length} of ${serialNumbers.length} machines. Failed serials: ${failedSerials}`,
+				);
+			}
+			return "successfully added to all machines";
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
 				if (!error.response) {
@@ -160,107 +179,105 @@ export class MachineRepository {
 	}
 	async removeUser({
 		apiKey,
-		serialNumber,
+		serialNumbers,
 		biometricCode,
 	}: {
 		apiKey: string;
-		serialNumber: string;
+		serialNumbers: string[];
 		biometricCode: number;
 	}): Promise<string> {
-		try {
-			const res = await axios.post(
-				`${env.MACHINE_SERVER}/DeleteUser`,
-				{
-					APIKey: apiKey,
-					EmployeeCode: biometricCode.toString(),
-					SerialNumber: serialNumber,
-				},
-				{
-					timeout: 5000,
-				},
+		const results = await Promise.allSettled(
+			serialNumbers.map((s_no) =>
+				axios.post(
+					`${env.MACHINE_SERVER}/DeleteUser`,
+					{
+						APIKey: apiKey,
+						EmployeeCode: biometricCode.toString(),
+						SerialNumber: s_no,
+					},
+					{ timeout: 5000 },
+				),
+			),
+		);
+
+		const failed = results.filter((r) => r.status === "rejected");
+		if (failed.length > 0) {
+			throw new MachineError(
+				MachineErrorCode.API_REJECTED,
+				`Failed to remove user from ${failed.length} of ${serialNumbers.length} machines`,
 			);
-			return res.data;
-		} catch (error) {
-			if (axios.isAxiosError(error)) {
-				if (!error.response) {
-					throw new MachineError(MachineErrorCode.API_UNREACHABLE);
-				}
-				if (error.response.status < 500) {
-					throw new MachineError(MachineErrorCode.API_REJECTED);
-				}
-				throw new MachineError(MachineErrorCode.API_SERVER_ERROR);
-			}
-			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
 		}
+
+		return "User removed from all machines successfully";
 	}
 	async toggleUserBlock({
 		apiKey,
-		serialNumber,
+		serialNumbers,
 		biometricCode,
 		block,
 	}: {
 		apiKey: string;
-		serialNumber: string;
+		serialNumbers: string[];
 		biometricCode: number;
 		block: boolean;
 	}): Promise<string> {
-		try {
-			const res = await axios.get(`${env.MACHINE_SERVER}/BlockUserinBiometric`, {
-				params: {
-					APIKey: apiKey,
-					EmployeeCode: biometricCode.toString(),
-					SerialNumber: serialNumber,
-					BlockUser: block ? 0 : 1,
-				},
-				timeout: 5000,
-			});
-			return res.data;
-		} catch (error) {
-			if (axios.isAxiosError(error)) {
-				if (!error.response) {
-					throw new MachineError(MachineErrorCode.API_UNREACHABLE);
-				}
-				if (error.response.status < 500) {
-					throw new MachineError(MachineErrorCode.API_REJECTED);
-				}
-				throw new MachineError(MachineErrorCode.API_SERVER_ERROR);
-			}
-			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
+		const results = await Promise.allSettled(
+			serialNumbers.map((s_no) =>
+				axios.get(`${env.MACHINE_SERVER}/BlockUserinBiometric`, {
+					params: {
+						APIKey: apiKey,
+						EmployeeCode: biometricCode.toString(),
+						SerialNumber: s_no,
+						BlockUser: block ? 0 : 1,
+					},
+					timeout: 5000,
+				}),
+			),
+		);
+
+		const failed = results.filter((r) => r.status === "rejected");
+		if (failed.length > 0) {
+			throw new MachineError(
+				MachineErrorCode.API_REJECTED,
+				`Failed to ${block ? "block" : "unblock"} user on ${failed.length} of ${serialNumbers.length} machines`,
+			);
 		}
+
+		return `User ${block ? "blocked" : "unblocked"} on all machines successfully`;
 	}
 	async setUserExpiration({
 		apiKey,
-		serialNumber,
+		serialNumbers,
 		biometricCode,
 		expirationDate,
 	}: {
 		apiKey: string;
-		serialNumber: string;
+		serialNumbers: string[];
 		biometricCode: number;
 		expirationDate: Date;
 	}): Promise<string> {
-		try {
-			const res = await axios.get(`${env.MACHINE_SERVER}/SetUserExpiration`, {
-				params: {
-					APIKey: apiKey,
-					SerialNumber: serialNumber,
-					EmployeeCode: biometricCode.toString(),
-					ExpirationDate: expirationDate.toISOString().split("T")[0],
-				},
-				timeout: 5000,
-			});
-			return res.data;
-		} catch (error) {
-			if (axios.isAxiosError(error)) {
-				if (!error.response) {
-					throw new MachineError(MachineErrorCode.API_UNREACHABLE);
-				}
-				if (error.response.status < 500) {
-					throw new MachineError(MachineErrorCode.API_REJECTED);
-				}
-				throw new MachineError(MachineErrorCode.API_SERVER_ERROR);
-			}
-			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
+		const results = await Promise.allSettled(
+			serialNumbers.map((s_no) =>
+				axios.get(`${env.MACHINE_SERVER}/SetUserExpiration`, {
+					params: {
+						APIKey: apiKey,
+						SerialNumber: s_no,
+						EmployeeCode: biometricCode.toString(),
+						ExpirationDate: expirationDate.toISOString().split("T")[0],
+					},
+					timeout: 5000,
+				}),
+			),
+		);
+
+		const failed = results.filter((r) => r.status === "rejected");
+		if (failed.length > 0) {
+			throw new MachineError(
+				MachineErrorCode.API_REJECTED,
+				`Failed to set expiration on ${failed.length} of ${serialNumbers.length} machines`,
+			);
 		}
+
+		return "Expiration set on all machines successfully";
 	}
 }

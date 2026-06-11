@@ -28,9 +28,8 @@ export const onboardMemberSchema = z.object({
 	membershipStartDate: z.coerce.date(),
 	dueAmount: z.number().min(0).default(0),
 	membershipAmount: z.number().min(1).max(1_00_00_000),
-	isMachined: z.boolean().default(false),
-	apiKey: z.string(),
-	serialNumber: z.string(),
+	isMachine: z.boolean().default(false),
+	serialNumbers: z.array(z.string()),
 	cardNumber: z.string(),
 	IsBioPasswordUpload: z.boolean().optional(),
 	IsCardUpload: z.boolean().optional(),
@@ -62,14 +61,15 @@ export const updateMemberSchema = z.object({
 	dateOfBirth: z.coerce.date(),
 });
 export const deleteMemberSchema = z.object({
-	serialNumber: z.string(),
-	apiKey: z.string(),
+	serialNumbers: z.array(z.string()),
 	memberId: z.string(),
 	isMachine: z.boolean(),
 });
 
 export const listMembersQuerySchema = z.object({
 	status: z.enum(MemberStatus).optional(),
+	serialNumber: z.string().min(1).max(100),
+	isMachine: z.boolean().default(false),
 	search: z.string().optional(),
 	page: z.coerce.number().min(1).default(1),
 	limit: z.coerce.number().min(1).max(100).default(20),
