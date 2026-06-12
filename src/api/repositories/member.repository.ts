@@ -240,6 +240,7 @@ export class MemberRepository {
 						gymId,
 						memberId: member.id,
 						membershipId: membership.id,
+						category: "Membership",
 					},
 				});
 			}
@@ -715,6 +716,7 @@ export class MemberRepository {
 					description: "membership payment",
 					memberId: memberId,
 					gymId: curr_membership.member.gymId,
+					category: "Membership",
 				},
 			});
 			return curr_membership;

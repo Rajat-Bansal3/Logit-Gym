@@ -1,4 +1,3 @@
-import { PaymentError, PaymentErrorCode } from "../../shared/errors/payment-errors";
 import type {
 	CreatePaymentInput,
 	CreatePaymentOutput,
@@ -7,63 +6,19 @@ import type {
 import { client } from "../../shared/utils/prisma";
 
 export class PaymentRepository {
-	createPayment = async (
-		memberId: string,
-		gymId: string,
-		data: CreatePaymentInput,
-	): Promise<CreatePaymentOutput> => {
-		const member = await client.member.findUnique({
-			where: { id: memberId },
-			select: {
-				gymId: true,
+	createPayment = async (gymId: string, data: CreatePaymentInput): Promise<CreatePaymentOutput> => {
+		const payment = await client.payment.create({
+			data: {
+				amount: data.amount,
+				paidDate: data.paidDate,
+				...(data.description ? { description: data.description } : null),
+				status: "PAID", //REVIEW
+				gymId: gymId,
+				category: data.category,
 			},
 		});
-		if (!member) {
-			throw new PaymentError(PaymentErrorCode.NOT_FOUND, "Member not found");
-		}
-		if (member.gymId !== gymId) {
-			throw new PaymentError(PaymentErrorCode.FORBIDDEN, "Member does not belong to this gym");
-		}
-		const result = await client.$transaction(async (tx) => {
-			const transaction = await tx.transaction.create({
-				data: {
-					amount: data.amount,
-					method: data.method,
-					type: data.transactionType,
-					date: data.paidDate,
-					gymId: gymId,
-					memberId: memberId,
-					...(data.description ? { description: data.description } : null),
-					status: data.status,
-				},
-			});
 
-			await tx.membership.update({
-				where: { id: data.membershipId },
-				data: { dueAmount: { decrement: data.amount } },
-			});
-
-			const payment = await tx.payment.create({
-				data: {
-					amount: data.amount,
-					membershipId: data.membershipId,
-					dueDate: data.dueDate,
-					paidDate: data.paidDate,
-					...(data.description ? { description: data.description } : null),
-					status: data.status,
-					memberId: memberId,
-					gymId: gymId,
-					transactionId: transaction.id,
-				},
-				include: {
-					transaction: true,
-				},
-			});
-
-			return payment.id;
-		});
-
-		return { id: result };
+		return { id: payment.id };
 	};
 	getPayments = async (
 		gymId: string,

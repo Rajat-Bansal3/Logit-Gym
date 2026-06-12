@@ -36,11 +36,7 @@ export class PaymentController {
 				throw new PaymentError(PaymentErrorCode.BAD_REQUEST, "invalid payment data");
 			}
 
-			const payment = await this.paymentService.createPayment(
-				payload.data.memberId,
-				gymId,
-				payload.data,
-			);
+			const payment = await this.paymentService.createPayment(gymId, payload.data);
 
 			this.logger.debug("addPayment: completed", {
 				userId: user.id,

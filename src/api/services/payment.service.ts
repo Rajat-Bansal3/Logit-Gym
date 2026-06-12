@@ -23,12 +23,11 @@ export class PaymentService {
 		this.logger = new AppLogger();
 	}
 	async createPayment(
-		memberId: string,
 		gymId: string,
 		data: CreatePaymentInput,
 	): Promise<BaseResponse<CreatePaymentOutput>> {
 		this.logger.debug("createPayment: creating payment");
-		const new_payment = await this.paymentRepository.createPayment(memberId, gymId, data);
+		const new_payment = await this.paymentRepository.createPayment(gymId, data);
 
 		if (!new_payment.id) {
 			throw new PaymentError(PaymentErrorCode.BAD_REQUEST, "error creating payment");
