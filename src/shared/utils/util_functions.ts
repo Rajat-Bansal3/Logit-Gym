@@ -43,3 +43,8 @@ export function computeAge(dateOfBirth: Date): number {
 	}
 	return age;
 }
+export const ALLOWED_MIMETYPES: Record<string, string> = {
+	"image/jpeg": "jpg",
+	"image/png": "png",
+	"image/webp": "webp",
+};

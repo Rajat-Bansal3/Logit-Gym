@@ -30,7 +30,7 @@ export class GymRepository {
 		});
 	};
 	create = async (data: { name: string; address: string; ownerId: string }): Promise<Gym> => {
-		return await this.client.gym.create({
+		const gym = await this.client.gym.create({
 			data: {
 				name: data.name,
 				address: data.address,
@@ -38,6 +38,12 @@ export class GymRepository {
 				hash: `${data.name}-${crypto.randomUUID()}`,
 			},
 		});
+		await this.client.gymMetrics.create({
+			data: {
+				gymId: gym.id,
+			},
+		});
+		return gym;
 	};
 	createProfile = async (
 		gymId: string,

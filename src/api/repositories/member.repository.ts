@@ -46,7 +46,6 @@ const memberWithDetails = {
 export type GymOverviewReport = {
 	totalRevenue: number;
 	pendingDues: number;
-	growthPercentage: number;
 	activeMembers: number;
 	inactiveMembers: number;
 	suspendedMembers: number;
@@ -254,7 +253,6 @@ export class MemberRepository {
 			await tx.memberMetrics.create({
 				data: { memberId: member.id },
 			});
-
 			return updated;
 		});
 	}
@@ -333,78 +331,85 @@ export class MemberRepository {
 				data: { gymId: member.gymId, memberId: member.id, type: "IN" },
 			});
 
+			const mem_metrics = await tx.memberMetrics.findUnique({
+				where: { memberId: member.id },
+			});
+			const { newStreak, alreadyCheckedInToday } = this.getStreakUpdate(
+				mem_metrics?.currentStreak ?? 0,
+				mem_metrics?.lastCheckIn ?? null,
+			);
+
 			await tx.memberMetrics.update({
 				where: { memberId: member.id },
 				data: {
 					lastCheckIn: log.timestamp,
 					totalCheckIns: { increment: 1 },
+					currentStreak: newStreak,
 					lastUpdated: new Date(),
 				},
 			});
-			const aggregate = [...member.attendanceAggregate];
-			const dayIndex = days.indexOf(day);
-			aggregate[dayIndex] = (aggregate[dayIndex] ?? 0) + 1;
-			await tx.member.update({
-				where: {
-					id: member.id,
-				},
-				data: {
-					attendanceAggregate: aggregate,
-				},
-			});
+
+			if (!alreadyCheckedInToday) {
+				const aggregate = [...member.attendanceAggregate];
+				const dayIndex = days.indexOf(day);
+				aggregate[dayIndex] = (aggregate[dayIndex] ?? 0) + 1;
+				await tx.member.update({
+					where: { id: member.id },
+					data: { attendanceAggregate: aggregate },
+				});
+			}
 
 			return log;
 		});
 	}
 
-	async getGymOverviewReport(_gymId: string, _query: ReportQuery): Promise<GymOverviewReport> {
-		// const { from, to } = query;
-		// const hasDateFilter = from !== undefined || to !== undefined;
-		// const dateFilter = {
-		//   ...(from !== undefined && { gte: from }),
-		//   ...(to !== undefined && { lte: to }),
-		// };
-
-		// const [metrics, statusCounts, newMembers] = await this.prisma.$transaction([
-		//   this.prisma.gymMetrics.findUnique({
-		//     where: { gymId },
-		//   }),
-		//   this.prisma.member.groupBy({
-		//     by: ["status"],
-		//     where: { gymId },
-		//     _count: { _all: true },
-		//     orderBy: { status: "asc" },
-		//   }),
-		//   this.prisma.member.count({
-		//     where: {
-		//       gymId,
-		//       ...(hasDateFilter && { createdAt: dateFilter }),
-		//     },
-		//   }),
-		// ]);
-
-		// const statusMap = Object.fromEntries(
-		//   statusCounts.map((s) => [s.status, s._count!._all]), //FIX
-		// );
-
-		// return {
-		//   totalRevenue: metrics?.totalRevenue ?? 0,
-		//   pendingDues: metrics?.pendingDues ?? 0,
-		//   growthPercentage: metrics?.growthPercentage ?? 0,
-		//   activeMembers: statusMap["ACTIVE"] ?? 0,
-		//   inactiveMembers: statusMap["INACTIVE"] ?? 0,
-		//   suspendedMembers: statusMap["SUSPENDED"] ?? 0,
-		//   newMembersInRange: newMembers,
-		// };
-		return {
-			totalRevenue: 0,
-			pendingDues: 0,
-			growthPercentage: 0,
-			activeMembers: 0,
-			inactiveMembers: 0,
-			suspendedMembers: 0,
-			newMembersInRange: 0,
+	async getGymOverviewReport(gymId: string, query: ReportQuery): Promise<GymOverviewReport> {
+		const { from, to } = query;
+		const hasDateFilter = from !== undefined || to !== undefined;
+		const dateFilter = {
+			...(from !== undefined && { gte: from }),
+			...(to !== undefined && { lte: to }),
 		};
+
+		const [metrics, statusCounts, newMembers] = await this.prisma.$transaction([
+			this.prisma.gymMetrics.findUnique({
+				where: { gymId },
+			}),
+			this.prisma.member.groupBy({
+				by: ["status"],
+				where: { gymId },
+				_count: { _all: true },
+				orderBy: { status: "asc" },
+			}),
+			this.prisma.member.count({
+				where: {
+					gymId,
+					...(hasDateFilter && { createdAt: dateFilter }),
+				},
+			}),
+		]);
+
+		const statusMap = Object.fromEntries(
+			statusCounts.map((s) => [s.status, s._count!._all]), //FIX
+		);
+
+		return {
+			totalRevenue: metrics?.totalRevenue ?? 0,
+			pendingDues: metrics?.pendingDues ?? 0,
+			activeMembers: statusMap.ACTIVE ?? 0,
+			inactiveMembers: statusMap.INACTIVE ?? 0,
+			suspendedMembers: statusMap.SUSPENDED ?? 0,
+			newMembersInRange: newMembers,
+		};
+		// return {
+		// 	totalRevenue: 0,
+		// 	pendingDues: 0,
+		// 	growthPercentage: 0,
+		// 	activeMembers: 0,
+		// 	inactiveMembers: 0,
+		// 	suspendedMembers: 0,
+		// 	newMembersInRange: 0,
+		// };
 	}
 
 	async getAttendanceReport(gymId: string, query: ReportQuery): Promise<AttendanceReport> {
@@ -472,66 +477,67 @@ export class MemberRepository {
 	}
 
 	async getMemberMetricsReport(gymId: string, _query: ReportQuery): Promise<MemberMetricsReport> {
-		const members = await this.prisma.member.findMany({
-			where: { gymId, status: "ACTIVE" },
-			include: { memberMetrics: true },
-		});
+		const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
 
-		const withMetrics = members.filter((m) => m.memberMetrics !== null);
+		const [averages, topAttendees, churnRisk, paymentStatusBreakdown] = await Promise.all([
+			this.prisma.memberMetrics.aggregate({
+				where: { member: { gymId, status: "ACTIVE" } },
+				_avg: {
+					attendancePercentage: true,
+					currentStreak: true,
+				},
+			}),
 
-		const avg = (nums: number[]) =>
-			nums.length === 0 ? 0 : nums.reduce((a, b) => a + b, 0) / nums.length;
+			this.prisma.memberMetrics.findMany({
+				where: { member: { gymId, status: "ACTIVE" } },
+				orderBy: { attendancePercentage: "desc" },
+				take: 10,
+				include: {
+					member: { select: { id: true, name: true } },
+				},
+			}),
 
-		const topAttendees = [...withMetrics]
-			.sort((a, b) => b.memberMetrics!.attendancePercentage - a.memberMetrics!.attendancePercentage)
-			.slice(0, 10)
-			.map((m) => ({
-				memberId: m.id,
-				name: m.name,
-				attendancePercentage: m.memberMetrics!.attendancePercentage,
-				currentStreak: m.memberMetrics!.currentStreak,
-			}));
+			this.prisma.memberMetrics.findMany({
+				where: {
+					member: { gymId, status: "ACTIVE" },
+					OR: [{ lastCheckIn: { lt: sevenDaysAgo } }, { lastCheckIn: null }],
+				},
+				orderBy: { lastCheckIn: "asc" },
+				take: 20,
+				include: {
+					member: { select: { id: true, name: true } },
+				},
+			}),
 
-		const paymentStatusBreakdown = await this.prisma.memberMetrics
-			.groupBy({
+			this.prisma.memberMetrics.groupBy({
 				by: ["paymentStatus"],
 				where: { member: { gymId } },
 				_count: { paymentStatus: true },
-			})
-			.then((rows) =>
-				rows.map((r) => ({
-					status: r.paymentStatus,
-					count: r._count.paymentStatus,
-				})),
-			);
-
-		const now = new Date();
-		const churnRisk = withMetrics
-			.map((m) => {
-				const lastCheckIn = m.memberMetrics!.lastCheckIn;
-				const daysSinceLastCheckIn =
-					lastCheckIn === null
-						? null
-						: Math.floor((now.getTime() - lastCheckIn.getTime()) / 86_400_000);
-				return {
-					memberId: m.id,
-					name: m.name,
-					lastCheckIn,
-					daysSinceLastCheckIn,
-				};
-			})
-			.filter((m) => m.daysSinceLastCheckIn === null || m.daysSinceLastCheckIn > 7)
-			.sort((a, b) => (b.daysSinceLastCheckIn ?? Infinity) - (a.daysSinceLastCheckIn ?? Infinity))
-			.slice(0, 20);
+			}),
+		]);
 
 		return {
-			averageAttendancePercentage: avg(
-				withMetrics.map((m) => m.memberMetrics!.attendancePercentage),
-			),
-			averageStreak: avg(withMetrics.map((m) => m.memberMetrics!.currentStreak)),
-			topAttendees,
-			paymentStatusBreakdown,
-			churnRisk,
+			averageAttendancePercentage: averages._avg.attendancePercentage ?? 0,
+			averageStreak: averages._avg.currentStreak ?? 0,
+			topAttendees: topAttendees.map((m) => ({
+				memberId: m.member.id,
+				name: m.member.name,
+				attendancePercentage: m.attendancePercentage,
+				currentStreak: m.currentStreak,
+			})),
+			churnRisk: churnRisk.map((m) => ({
+				memberId: m.member.id,
+				name: m.member.name,
+				lastCheckIn: m.lastCheckIn,
+				daysSinceLastCheckIn:
+					m.lastCheckIn === null
+						? null
+						: Math.floor((Date.now() - m.lastCheckIn.getTime()) / 86_400_000),
+			})),
+			paymentStatusBreakdown: paymentStatusBreakdown.map((r) => ({
+				status: r.paymentStatus,
+				count: r._count.paymentStatus,
+			})),
 		};
 	}
 	async getMemberattendance(memberId: string): Promise<MemberAttendanceOut> {
@@ -722,5 +728,40 @@ export class MemberRepository {
 			return curr_membership;
 		});
 		return curr_membership;
+	}
+	getStreakUpdate(
+		currentStreak: number,
+		lastCheckIn: Date | null,
+	): { newStreak: number; alreadyCheckedInToday: boolean } {
+		const toLocalMidnight = (date: Date): Date => {
+			const parts = new Intl.DateTimeFormat("en-US", {
+				year: "numeric",
+				month: "2-digit",
+				day: "2-digit",
+			}).formatToParts(date);
+
+			const year = parts.find((p) => p.type === "year")!.value;
+			const month = parts.find((p) => p.type === "month")!.value;
+			const day = parts.find((p) => p.type === "day")!.value;
+
+			return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+		};
+
+		const now = toLocalMidnight(new Date());
+
+		if (!lastCheckIn) {
+			return { newStreak: 1, alreadyCheckedInToday: false };
+		}
+
+		const last = toLocalMidnight(lastCheckIn);
+		const diff = Math.floor((now.getTime() - last.getTime()) / 86_400_000);
+
+		if (diff === 0) {
+			return { newStreak: currentStreak, alreadyCheckedInToday: true };
+		}
+		if (diff === 1) {
+			return { newStreak: currentStreak + 1, alreadyCheckedInToday: false };
+		}
+		return { newStreak: 1, alreadyCheckedInToday: false };
 	}
 }

@@ -17,6 +17,16 @@ export class PaymentRepository {
 				category: data.category,
 			},
 		});
+		await client.gymMetrics.update({
+			where: {
+				id: gymId,
+			},
+			data: {
+				totalRevenue: {
+					increment: data.amount,
+				},
+			},
+		});
 
 		return { id: payment.id };
 	};
@@ -36,27 +46,49 @@ export class PaymentRepository {
 			memberId: string | undefined;
 		},
 	): Promise<GetPaymentsOutput> => {
-		const total = await client.payment.count({
-			where: {
-				gymId: gymId,
-			},
-		});
-		const payments = await client.payment.findMany({
-			where: {
-				...(startDate && { paidDate: startDate }),
-				...(endDate && { dueDate: endDate }),
-				...(memberId && { memberId: memberId }),
-				gymId: gymId,
-			},
-			skip: limit * (page - 1),
-			take: limit,
-		});
+		const where = {
+			gymId,
+			...(memberId && { memberId }),
+			...((startDate || endDate) && {
+				paidDate: {
+					...(startDate && { gte: startDate }),
+					...(endDate && { lte: endDate }),
+				},
+			}),
+		};
+
+		const [total, payments] = await Promise.all([
+			client.payment.count({ where }),
+			client.payment.findMany({
+				where,
+				skip: limit * (page - 1),
+				take: limit,
+				orderBy: {
+					paidDate: "desc",
+				},
+				include: {
+					member: {
+						select: {
+							id: true,
+							name: true,
+						},
+					},
+					transaction: {
+						select: {
+							type: true,
+							method: true,
+						},
+					},
+				},
+			}),
+		]);
+
 		return {
-			payments: payments,
+			payments,
 			pagination: {
-				total: total,
+				total,
 				current: page,
-				limit: limit,
+				limit,
 			},
 		};
 	};

@@ -41,6 +41,10 @@ export const addMachineSchema = z.object({
 	machineName: z.string().min(1).max(100),
 	api_key: z.string().min(1).max(100),
 });
+export const getPresignedUrlsSchema = z.object({
+	memberId: z.string(),
+	mimeType: z.string(),
+});
 
 export type UpdateGym = z.infer<typeof updateGymSchema>;
 export type CreateGym = z.infer<typeof createGymSchema>;

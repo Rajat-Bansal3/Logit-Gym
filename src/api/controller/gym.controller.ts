@@ -1,6 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
-import { addMachineSchema, createGymSchema, updateGymSchema } from "../../shared/types/gym.types";
+import {
+	addMachineSchema,
+	createGymSchema,
+	getPresignedUrlsSchema,
+	updateGymSchema,
+} from "../../shared/types/gym.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { GymService } from "../services/gym.service";
@@ -121,6 +126,19 @@ export class GymController {
 				error,
 			});
 			next(error);
+			return;
+		}
+	};
+	getPresignedUrls = async (req: Request, res: Response, next: NextFunction) => {
+		const data = getPresignedUrlsSchema.parse(req.body);
+		try {
+			const pre_urls = await this.gymService.generatePresignedUrl({
+				memberCode: data.memberId,
+				mimetype: data.mimeType,
+			});
+			return res.status(200).json(pre_urls);
+		} catch (err) {
+			next(err);
 			return;
 		}
 	};

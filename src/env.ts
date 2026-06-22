@@ -12,6 +12,8 @@ const envSchema = z.object({
 	JWT_ACCESS_SECRET: z.string().nonempty(),
 	JWT_REFRESH_SECRET: z.string().nonempty(),
 	SALT: z.coerce.number().default(10),
+	AWS_S3_BUCKET: z.coerce.string().min(5).max(50),
+	AWS_REGION: z.coerce.string().min(5).max(50),
 	NODE_ENV: z.enum(["development", "testing", "production"]).default("development"),
 });
 const data = envSchema.safeParse(process.env);

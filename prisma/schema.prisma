@@ -378,7 +378,6 @@ model GymMetrics {
   currentOccupancy Int      @default(0)
   totalRevenue     Float    @default(0)
   pendingDues      Float    @default(0)
-  growthPercentage Float    @default(0)
   lastUpdated      DateTime @default(now())
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
