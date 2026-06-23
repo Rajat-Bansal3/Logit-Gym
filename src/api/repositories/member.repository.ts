@@ -119,7 +119,7 @@ export type MemberAttendanceOut = Prisma.AttendanceLogGetPayload<{
 }>[];
 
 export class MemberRepository {
-	constructor(private readonly prisma: PrismaClient) {}
+	constructor(private readonly prisma: PrismaClient) { }
 
 	async findByPhone(phone: string): Promise<Member | null> {
 		return this.prisma.member.findUnique({ where: { phone } });
@@ -160,12 +160,12 @@ export class MemberRepository {
 			}),
 			...(isMachine === true &&
 				serialNumber !== undefined && {
-					memberMachines: {
-						some: {
-							machine: { serialNumber },
-						},
+				memberMachines: {
+					some: {
+						machine: { serialNumber },
 					},
-				}),
+				},
+			}),
 		};
 
 		const [members, total] = await this.prisma.$transaction([
@@ -378,7 +378,6 @@ export class MemberRepository {
 			this.prisma.member.groupBy({
 				by: ["status"],
 				where: { gymId },
-				_count: { _all: true },
 				orderBy: { status: "asc" },
 			}),
 			this.prisma.member.count({
@@ -390,7 +389,7 @@ export class MemberRepository {
 		]);
 
 		const statusMap = Object.fromEntries(
-			statusCounts.map((s) => [s.status, s._count!._all]), //FIX
+			statusCounts.map((s) => [s.status, s.status.length]), //FIX
 		);
 
 		return {

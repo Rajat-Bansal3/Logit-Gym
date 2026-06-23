@@ -1,9 +1,9 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
-import { AppError } from "@/shared/errors/app-errors";
-import { s3 } from "@/shared/utils/s3";
-import { ALLOWED_MIMETYPES } from "@/shared/utils/util_functions";
+import { AppError } from "../../shared/errors/app-errors";
+import { s3 } from "../../shared/utils/s3";
+import { ALLOWED_MIMETYPES } from "../../shared/utils/util_functions";
 import { env } from "../../env";
 import type { PrismaClient } from "../../generated/client";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
