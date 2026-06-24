@@ -19,7 +19,7 @@ export class PaymentRepository {
 		});
 		await client.gymMetrics.update({
 			where: {
-				id: gymId,
+				gymId: gymId,
 			},
 			data: {
 				totalRevenue: {

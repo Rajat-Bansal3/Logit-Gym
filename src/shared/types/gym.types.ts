@@ -42,7 +42,7 @@ export const addMachineSchema = z.object({
 	api_key: z.string().min(1).max(100),
 });
 export const getPresignedUrlsSchema = z.object({
-	memberId: z.string(),
+	id: z.string(),
 	mimeType: z.string(),
 });
 

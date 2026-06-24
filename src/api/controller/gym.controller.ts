@@ -133,7 +133,7 @@ export class GymController {
 		const data = getPresignedUrlsSchema.parse(req.body);
 		try {
 			const pre_urls = await this.gymService.generatePresignedUrl({
-				memberCode: data.memberId,
+				code: data.id,
 				mimetype: data.mimeType,
 			});
 			return res.status(200).json(pre_urls);

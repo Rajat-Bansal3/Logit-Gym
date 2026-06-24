@@ -177,10 +177,10 @@ export class GymService {
 		};
 	}
 	generatePresignedUrl = async ({
-		memberCode,
+		code,
 		mimetype,
 	}: {
-		memberCode: string;
+		code: string;
 		mimetype: string;
 	}): Promise<{ presignedUrl: string; key: string }> => {
 		const ext = ALLOWED_MIMETYPES[mimetype];
@@ -188,7 +188,7 @@ export class GymService {
 			throw new AppError("Invalid file type", 400);
 		}
 
-		const key = `members/${memberCode}/avatar/${uuidv4}.${ext}`;
+		const key = `${code}/avatar/${uuidv4}.${ext}`;
 
 		const presignedUrl = await getSignedUrl(
 			s3,
