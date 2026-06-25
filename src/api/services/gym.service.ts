@@ -188,7 +188,7 @@ export class GymService {
 			throw new AppError("Invalid file type", 400);
 		}
 
-		const key = `${code}/avatar/${uuidv4}.${ext}`;
+		const key = `${code}/avatar/${uuidv4()}.${ext}`;
 
 		const presignedUrl = await getSignedUrl(
 			s3,

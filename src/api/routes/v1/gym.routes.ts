@@ -36,7 +36,7 @@ router.delete("/:id", roleMiddleware("OWNER"), catchAsync(gymController.deleteGy
  */
 router.post("/add-machine", roleMiddleware("OWNER"), catchAsync(gymController.addMachine));
 
-router.get(
+router.post(
 	"/get-presigned-urls",
 	roleMiddleware("OWNER"),
 	catchAsync(gymController.getPresignedUrls),
