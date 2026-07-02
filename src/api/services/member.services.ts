@@ -9,7 +9,7 @@ import type {
 	ReportQuery,
 	UpdateMember,
 } from "../../shared/types/member.types";
-import type { CreateMemberMembershipWithMachineInput } from "../../shared/types/payment.types";
+import type { CreateMemberMembershipInput } from "../../shared/types/payment.types";
 import type { BaseResponse } from "../../shared/types/returns";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
@@ -419,10 +419,10 @@ export class MemberService {
 	}
 	async createMemberMembership(
 		memberId: string,
-		data: CreateMemberMembershipWithMachineInput,
+		data: CreateMemberMembershipInput,
 	): Promise<BaseResponse<null>> {
 		const membership = await this.memberRepository.createMemberMembership(memberId, data);
-		if (data.isMachine && membership.endDate) {
+		if (data.isMachine && data.serialNumber && membership.endDate) {
 			await this.machineRepository.setUserExpiration({
 				apiKey: env.MACHINE_SERVER_API_KEY,
 				biometricCode: membership.member.biometricCode,

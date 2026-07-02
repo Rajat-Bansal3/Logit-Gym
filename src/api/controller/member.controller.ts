@@ -10,7 +10,7 @@ import {
 	reportQuerySchema,
 	updateMemberSchema,
 } from "../../shared/types/member.types";
-import { createMemberShipWithMachine } from "../../shared/types/payment.types";
+import { createMembershipSchema } from "../../shared/types/payment.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { MemberService } from "../services/member.services";
@@ -425,7 +425,7 @@ export class MemberController {
 			this.logger.debug("createMemberMembership req recieved");
 			const user = req.user;
 			const memberId = req.params.memberId;
-			const data = createMemberShipWithMachine.parse(req.body);
+			const data = createMembershipSchema.parse(req.body);
 			if (!user || !user.gymId || !memberId || Array.isArray(memberId)) {
 				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
 			}

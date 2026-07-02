@@ -119,7 +119,7 @@ export type MemberAttendanceOut = Prisma.AttendanceLogGetPayload<{
 }>[];
 
 export class MemberRepository {
-	constructor(private readonly prisma: PrismaClient) { }
+	constructor(private readonly prisma: PrismaClient) {}
 
 	async findByPhone(phone: string): Promise<Member | null> {
 		return this.prisma.member.findUnique({ where: { phone } });
@@ -160,12 +160,12 @@ export class MemberRepository {
 			}),
 			...(isMachine === true &&
 				serialNumber !== undefined && {
-				memberMachines: {
-					some: {
-						machine: { serialNumber },
+					memberMachines: {
+						some: {
+							machine: { serialNumber },
+						},
 					},
-				},
-			}),
+				}),
 		};
 
 		const [members, total] = await this.prisma.$transaction([
