@@ -49,23 +49,24 @@ export class UserRepository {
 		});
 	};
 	createUser = async (data: RegisterInput): Promise<UserEmailLookup> => {
-		return await this.client.user.create({
-			data,
+		return this.client.user.create({
+			data: {
+				email: data.email,
+				password: data.password,
+				role: data.role,
+				...(data.role === "MEMBER" && {
+					member: {
+						connect: { email: data.email },
+					},
+				}),
+			},
 			select: {
 				id: true,
 				role: true,
 				email: true,
 				password: true,
-				gym: {
-					select: {
-						id: true,
-					},
-				},
-				member: {
-					select: {
-						id: true,
-					},
-				},
+				gym: { select: { id: true } },
+				member: { select: { id: true } },
 			},
 		});
 	};

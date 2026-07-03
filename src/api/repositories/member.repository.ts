@@ -686,46 +686,51 @@ export class MemberRepository {
 		});
 	}
 	async createMemberMembership(memberId: string, data: CreateMemberMembershipInput) {
-		const curr_membership = await this.prisma.$transaction(async (tx) => {
-			const curr_membership = await tx.membership.create({
-				data: {
-					memberId: memberId,
-					planType: data.planType,
-					startDate: data.startDate,
-					dueAmount: data.dueAmount,
-					endDate: computeMembershipEndDate(data.startDate, data.planType),
-					membershipAmount: data.membershipAmount,
-				},
-				select: {
-					id: true,
-					endDate: true,
-					member: {
-						select: {
-							gymId: true,
-							biometricCode: true,
+		const curr_membership = await this.prisma.$transaction(
+			async (tx) => {
+				const curr_membership = await tx.membership.create({
+					data: {
+						memberId: memberId,
+						planType: data.planType,
+						startDate: data.startDate,
+						dueAmount: data.dueAmount,
+						endDate: computeMembershipEndDate(data.startDate, data.planType),
+						membershipAmount: data.membershipAmount,
+					},
+					select: {
+						id: true,
+						endDate: true,
+						member: {
+							select: {
+								gymId: true,
+								biometricCode: true,
+							},
 						},
 					},
-				},
-			});
-			await tx.membership.update({
-				where: {
-					id: data.predecessor,
-				},
-				data: {
-					successorId: curr_membership.id,
-				},
-			});
-			await tx.payment.create({
-				data: {
-					amount: data.membershipAmount,
-					description: "membership payment",
-					memberId: memberId,
-					gymId: curr_membership.member.gymId,
-					category: "Membership",
-				},
-			});
-			return curr_membership;
-		});
+				});
+				await tx.membership.update({
+					where: {
+						id: data.predecessor,
+					},
+					data: {
+						successorId: curr_membership.id,
+					},
+				});
+				await tx.payment.create({
+					data: {
+						amount: data.membershipAmount,
+						description: "membership payment",
+						memberId: memberId,
+						gymId: curr_membership.member.gymId,
+						category: "Membership",
+					},
+				});
+				return curr_membership;
+			},
+			{
+				timeout: 25000,
+			},
+		);
 		return curr_membership;
 	}
 	getStreakUpdate(

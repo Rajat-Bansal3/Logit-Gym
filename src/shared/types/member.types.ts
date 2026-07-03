@@ -61,7 +61,7 @@ export const updateMemberSchema = z.object({
 	dateOfBirth: z.coerce.date(),
 });
 export const deleteMemberSchema = z.object({
-	serialNumbers: z.array(z.string()),
+	serialNumbers: z.array(z.string()).optional(),
 	memberId: z.string(),
 	isMachine: z.boolean(),
 });

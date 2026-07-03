@@ -209,7 +209,7 @@ export class MemberService {
 	async deleteMember(
 		memberId: string,
 		gymId: string,
-		serialNumbers: string[],
+		serialNumbers: string[] | undefined,
 		isMachine: boolean,
 		__user: AuthenticatedUser,
 	): Promise<BaseResponse<null>> {
@@ -226,7 +226,7 @@ export class MemberService {
 
 		await this.memberRepository.delete(memberId);
 
-		if (isMachine) {
+		if (isMachine && serialNumbers) {
 			await this.machineRepository.removeUser({
 				apiKey: env.MACHINE_SERVER_API_KEY,
 				serialNumbers,
