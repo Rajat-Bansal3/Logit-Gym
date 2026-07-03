@@ -108,6 +108,7 @@ export type MemberDashboardOut = {
 	days_left: Date | null;
 	due_amount: number;
 	activity_graph: number[];
+	metrics: MemberMetrics | null;
 };
 export type MemberAttendanceOut = Prisma.AttendanceLogGetPayload<{
 	include: {

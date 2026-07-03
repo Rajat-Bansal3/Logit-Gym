@@ -384,6 +384,7 @@ export class MemberService {
 			days_left: dashboard.currentMembership.endDate,
 			activity_graph: dashboard.attendanceAggregate,
 			due_amount: dashboard.currentMembership.dueAmount,
+			metrics: dashboard.memberMetrics,
 		};
 		return {
 			message: "dashboard fetched successfully",
