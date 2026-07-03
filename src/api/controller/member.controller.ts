@@ -357,7 +357,7 @@ export class MemberController {
 			if (!user) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
-			const gym = this.memberService.getMemberPayments(user.id);
+			const gym = await this.memberService.getMemberPayments(user.id);
 			res.status(200).json(gym);
 		} catch (error) {
 			next(error);

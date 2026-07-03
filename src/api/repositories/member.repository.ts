@@ -95,6 +95,7 @@ export type MemberDashboardData = Prisma.MemberGetPayload<{
 				gymProfile: true;
 			};
 		};
+		memberMetrics: true;
 		currentMembership: true;
 		user: true;
 	};
@@ -618,6 +619,7 @@ export class MemberRepository {
 			},
 			include: {
 				user: true,
+				currentMembership: true,
 			},
 		});
 	}
@@ -634,6 +636,7 @@ export class MemberRepository {
 						gymProfile: true,
 					},
 				},
+				memberMetrics: true,
 			},
 		});
 	}
