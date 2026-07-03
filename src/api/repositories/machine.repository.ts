@@ -119,7 +119,7 @@ export class MachineRepository {
 		serialNumbers: string[];
 		memberName: string;
 		biometricCode: number;
-		cardNumber: string;
+		cardNumber: string | undefined;
 		IsFaceUpload: boolean;
 		IsFPUpload: boolean;
 		IsCardUpload: boolean;

@@ -61,7 +61,7 @@ export class MemberService {
 
 		const member = await this.memberRepository.create(gymId, data);
 
-		if (data.isMachine) {
+		if (data.isMachine && data.serialNumbers) {
 			await this.machineRepository.addUser({
 				memberName: member.name,
 				biometricCode: member.biometricCode,

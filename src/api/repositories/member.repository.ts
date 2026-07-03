@@ -204,7 +204,7 @@ export class MemberRepository {
 					...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
 				},
 			});
-			if (input.isMachine && input.serialNumbers?.length > 0) {
+			if (input.isMachine && input.serialNumbers && input.serialNumbers?.length > 0) {
 				const machines = await tx.machines.findMany({
 					where: {
 						serialNumber: { in: input.serialNumbers },
