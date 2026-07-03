@@ -594,18 +594,22 @@ export class MemberRepository {
 		}
 	}
 	async getMemberPayments(userId: string): Promise<Payment[]> {
-		return (
-			(
-				await this.prisma.member.findUnique({
-					where: {
-						userId: userId,
-					},
-					include: {
-						payments: true,
-					},
-				})
-			)?.payments ?? []
-		);
+		const memberId = await this.prisma.member.findUnique({
+			where: {
+				userId,
+			},
+			select: {
+				id: true,
+			},
+		});
+		if (!memberId) {
+			return [];
+		}
+		return await this.prisma.payment.findMany({
+			where: {
+				memberId: memberId.id,
+			},
+		});
 	}
 	async profile(memberId: string): Promise<MemberIncludingUser | null> {
 		return await this.prisma.member.findUnique({
