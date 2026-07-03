@@ -50,13 +50,13 @@ export class PaymentRepository {
 			gymId,
 			...(memberId && { memberId }),
 			...((startDate || endDate) && {
-				paidDate: {
+				createdAt: {
 					...(startDate && { gte: startDate }),
 					...(endDate && { lte: endDate }),
 				},
 			}),
 		};
-
+		console.log(startDate, endDate);
 		const [total, payments] = await Promise.all([
 			client.payment.count({ where }),
 			client.payment.findMany({
@@ -73,16 +73,10 @@ export class PaymentRepository {
 							name: true,
 						},
 					},
-					transaction: {
-						select: {
-							type: true,
-							method: true,
-						},
-					},
 				},
 			}),
 		]);
-
+		console.log(payments);
 		return {
 			payments,
 			pagination: {
