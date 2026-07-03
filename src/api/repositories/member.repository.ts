@@ -272,7 +272,7 @@ export class MemberRepository {
         });
         await tx.gymMetrics.update({
           where: {
-            id: gymId,
+            gymId,
           },
           data: {
             totalRevenue: {
