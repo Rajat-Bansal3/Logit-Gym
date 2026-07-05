@@ -611,6 +611,9 @@ export class MemberRepository {
 			where: {
 				memberId: memberId.id,
 			},
+			include: {
+				gym: true,
+			},
 		});
 	}
 	async profile(memberId: string): Promise<MemberIncludingUser | null> {
