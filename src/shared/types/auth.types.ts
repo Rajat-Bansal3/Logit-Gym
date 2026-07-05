@@ -38,7 +38,7 @@ export const registerSchema = z.object({
 		.min(1, "Password is required")
 		.min(6, "Password must be at least 6 characters"),
 
-	role: z.nativeEnum(UserRole).default("MEMBER"),
+	role: z.enum(UserRole).default("MEMBER"),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
@@ -49,6 +49,7 @@ export type AccessTokenPayload = z.infer<
 		role: z.ZodEnum<typeof UserRole>;
 		gymId: z.ZodOptional<z.ZodString>;
 		memberId: z.ZodOptional<z.ZodString>;
+		userId: z.ZodString;
 		iat: z.ZodNumber;
 		exp: z.ZodNumber;
 	}>
@@ -59,9 +60,10 @@ const ValidateAccessTokenSchema = z.discriminatedUnion("valid", [
 		valid: z.literal(true),
 		user: z.object({
 			id: z.string(),
-			role: z.nativeEnum(UserRole),
+			role: z.enum(UserRole),
 			gymId: z.string().optional(),
 			memberId: z.string().optional(),
+			userId: z.string(),
 		}),
 	}),
 	z.object({
@@ -75,5 +77,6 @@ export const AuthenticatedUserSchema = z.object({
 	role: z.enum(UserRole),
 	gymId: z.string().optional(),
 	memberId: z.string().optional(),
+	userId: z.string(),
 });
 export type AuthenticatedUser = z.infer<typeof AuthenticatedUserSchema>;

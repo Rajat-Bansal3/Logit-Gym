@@ -47,9 +47,6 @@ export class GymController {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
 			const result = await this.gymService.getGym(gymId, user);
-			if (req.user) {
-				req.user.gymId = result.data?.id;
-			}
 			this.logger.debug("getGym: completed", { gymId });
 			res.status(200).json(result);
 		} catch (error) {

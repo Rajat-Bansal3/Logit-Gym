@@ -96,6 +96,7 @@ export class AuthService {
 			sub: userId,
 			role: userRole,
 		};
+		payload.userId = userId;
 		if (gymId) {
 			payload.gymId = gymId;
 		}
@@ -126,7 +127,16 @@ export class AuthService {
 			const user: AuthenticatedUser = {
 				id: payload.sub,
 				role: payload.role,
+				userId: payload.userId,
 			};
+
+			if (!payload.gymId) {
+				const gym = await client.gym.findFirst({
+					where: { ownerId: payload.userId },
+					select: { id: true },
+				});
+				payload.gymId = gym?.id;
+			}
 
 			if (payload.gymId) {
 				user.gymId = payload.gymId;
