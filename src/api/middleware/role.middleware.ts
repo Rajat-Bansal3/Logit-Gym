@@ -6,7 +6,7 @@ export const roleMiddleware = (role: UserRole) => {
 	return (req: Request, _res: Response, next: NextFunction) => {
 		const user = (req as any).user as { role?: string };
 
-		if (!user || !user.role) {
+		if (!user?.role) {
 			return new AuthError(AuthErrorCode.UNAUTHORIZED);
 		}
 

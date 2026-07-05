@@ -47,6 +47,9 @@ export class GymController {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
 			const result = await this.gymService.getGym(gymId, user);
+			if (req.user) {
+				req.user.gymId = result.data?.id;
+			}
 			this.logger.debug("getGym: completed", { gymId });
 			res.status(200).json(result);
 		} catch (error) {
@@ -96,7 +99,7 @@ export class GymController {
 	addMachine = async (req: Request, res: Response, next: NextFunction) => {
 		try {
 			const user = req.user;
-			if (!user || !user.gymId) {
+			if (!user?.gymId) {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
 			const data = addMachineSchema.parse(req.body);
@@ -114,7 +117,7 @@ export class GymController {
 	removeMachine = async (req: Request, res: Response, next: NextFunction) => {
 		try {
 			const user = req.user;
-			if (!user || !user.gymId) {
+			if (!user?.gymId) {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
 			const data = addMachineSchema.parse(req.body);

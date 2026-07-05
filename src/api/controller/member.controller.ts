@@ -112,7 +112,7 @@ export class MemberController {
 					? String(req.query.date)
 					: new Date().toISOString();
 			const date = z.coerce.date().parse(dateQuery);
-			if (!user || !user.gymId) {
+			if (!user?.gymId) {
 				throw new MemberError(MemberErrorCode.FORBIDDEN);
 			}
 			const attendances = await this.memberService.getGymAttendance(user.gymId, date);
@@ -231,7 +231,7 @@ export class MemberController {
 		try {
 			this.logger.debug("markAttendance: request received");
 			const user = req.user;
-			if (!user || !user.memberId) {
+			if (!user?.memberId) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 
@@ -326,7 +326,7 @@ export class MemberController {
 		try {
 			this.logger.debug("getMemberAttendance: request received");
 			const user = req.user;
-			if (!user || !user.memberId) {
+			if (!user?.memberId) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 			const attendances = await this.memberService.getMemberAttendance(user.memberId);
@@ -339,7 +339,7 @@ export class MemberController {
 		try {
 			this.logger.debug("getMemberGym request recieved");
 			const user = req.user;
-			if (!user || !user.memberId) {
+			if (!user?.memberId) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 			this.logger.debug("getMemberGym userId : ", user);
@@ -367,7 +367,7 @@ export class MemberController {
 		try {
 			this.logger.debug("profile request recieved");
 			const user = req.user;
-			if (!user || !user.memberId) {
+			if (!user?.memberId) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 			this.logger.debug("user: ", user.memberId);
@@ -381,7 +381,7 @@ export class MemberController {
 		try {
 			this.logger.debug("getMemberDashboard request recieved");
 			const user = req.user;
-			if (!user || !user.memberId) {
+			if (!user?.memberId) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 			this.logger.debug("user: dashboard", user);
@@ -395,7 +395,7 @@ export class MemberController {
 		try {
 			this.logger.debug("getGymOccupancy request recieved");
 			const user = req.user;
-			if (!user || !user.memberId) {
+			if (!user?.memberId) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 			const gym = await this.memberService.getGymOccupancy(user.memberId);
@@ -410,7 +410,7 @@ export class MemberController {
 			this.logger.debug("getMemberMembership req recieved");
 			const user = req.user;
 			const memberId = req.params.memberId;
-			if (!user || !user.gymId || !memberId || Array.isArray(memberId)) {
+			if (!user?.gymId || !memberId || Array.isArray(memberId)) {
 				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
 			}
 			const membership = await this.memberService.getMemberMembership(memberId);
@@ -426,7 +426,7 @@ export class MemberController {
 			const user = req.user;
 			const memberId = req.params.memberId;
 			const data = createMembershipSchema.parse(req.body);
-			if (!user || !user.gymId || !memberId || Array.isArray(memberId)) {
+			if (!user?.gymId || !memberId || Array.isArray(memberId)) {
 				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
 			}
 			const membership = await this.memberService.createMemberMembership(memberId, data);

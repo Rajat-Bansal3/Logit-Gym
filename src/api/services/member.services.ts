@@ -371,7 +371,7 @@ export class MemberService {
 			id: memberId,
 		});
 		const dashboard = await this.memberRepository.getMemberDashboard(memberId);
-		if (!dashboard || !dashboard.currentMembership) {
+		if (!dashboard?.currentMembership) {
 			throw new MemberError(MemberErrorCode.NOT_FOUND, "no dashboard with member found");
 		}
 		const plan_name =
