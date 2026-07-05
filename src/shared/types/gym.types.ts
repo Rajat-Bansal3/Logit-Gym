@@ -6,7 +6,7 @@ export const createGymSchema = z.object({
 	profile: z.object({
 		timing: z.string(),
 		openDays: z.array(z.string()),
-		fees: z.coerce.number(),
+		instagram: z.string().optional(),
 		genderAllowed: z.string(),
 		ownerName: z.string(),
 		ownerContact: z.string(),

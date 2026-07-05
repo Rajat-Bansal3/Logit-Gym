@@ -285,8 +285,8 @@ model GymProfile {
   bio           String?
   timing        String
   openDays      String[]
-  fees          Float
   genderAllowed String
+  instagram     String?
 
   ownerName         String
   ownerContact      String

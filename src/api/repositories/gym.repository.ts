@@ -55,7 +55,8 @@ export class GymRepository {
 
 				timing: profile.timing,
 				openDays: profile.openDays,
-				fees: profile.fees,
+				...(profile.instagram && { instagram: profile.instagram }),
+
 				genderAllowed: profile.genderAllowed,
 				ownerName: profile.ownerName,
 				ownerContact: profile.ownerContact,
