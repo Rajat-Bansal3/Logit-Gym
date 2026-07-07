@@ -3,11 +3,13 @@ import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import {
 	addMachineSchema,
 	createGymSchema,
+	createSubscriptionSchema,
 	getPresignedUrlsSchema,
 	updateGymSchema,
 } from "../../shared/types/gym.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
+import { createRZPPlan } from "../../shared/utils/rzp";
 import { GymService } from "../services/gym.service";
 
 export class GymController {
@@ -130,8 +132,8 @@ export class GymController {
 		}
 	};
 	getPresignedUrls = async (req: Request, res: Response, next: NextFunction) => {
-		const data = getPresignedUrlsSchema.parse(req.body);
 		try {
+			const data = getPresignedUrlsSchema.parse(req.body);
 			const pre_urls = await this.gymService.generatePresignedUrl({
 				code: data.id,
 				mimetype: data.mimeType,
@@ -139,6 +141,60 @@ export class GymController {
 			return res.status(200).json(pre_urls);
 		} catch (err) {
 			next(err);
+			return;
+		}
+	};
+
+	getPlans = async (_req: Request, res: Response, next: NextFunction) => {
+		try {
+			const plans = await this.gymService.getPlans();
+			return res.status(200).json(plans);
+		} catch (error) {
+			next(error);
+			return;
+		}
+	};
+	createPlan = async (_req: Request, res: Response, _next: NextFunction) => {
+		const plan = await createRZPPlan({
+			amount: 1000,
+			billingCycle: "MONTHLY",
+			name: "basic",
+		});
+		await client.plan.create({
+			data: {
+				billingCycle: "MONTHLY",
+				name: "basic",
+				price: 1000,
+				razorpayId: plan,
+			},
+		});
+		res.status(200).json({});
+	};
+	getSub = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "gym id not found");
+			}
+			const plans = await this.gymService.getSub(user.gymId);
+			return res.status(200).json(plans);
+		} catch (error) {
+			next(error);
+			return;
+		}
+	};
+
+	createSubscription = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const data = createSubscriptionSchema.parse(req.body);
+			const user = req.user;
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "gym id not found");
+			}
+			const subscription = await this.gymService.createGymSubscription(data, user.gymId);
+			return res.status(200).json(subscription);
+		} catch (error) {
+			next(error);
 			return;
 		}
 	};

@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import { WebhookController } from "./api/controller/webhook.controller";
 import { errorHandler } from "./api/middleware/error.middleware";
 import { httpLogger, requestIdMiddleware, requestLogger } from "./api/middleware/logger.middleware";
 import { notFoundHandler } from "./api/middleware/not-found.middleware";
@@ -25,6 +26,8 @@ export const createApp = () => {
 	app.use(httpLogger);
 	app.use(requestLogger);
 
+	const webhookController = new WebhookController();
+
 	app.get("/api/v1/health", (req, res) => {
 		const logger = appLogger.withRequest(req);
 		logger.info("Health check endpoint hit");
@@ -40,6 +43,11 @@ export const createApp = () => {
 	app.use("/api/v1/gym", require("./api/routes/v1/gym.routes").default);
 	app.use("/api/v1/payments", require("./api/routes/v1/payment.routes").default);
 	app.use("/api/v1/member", require("./api/routes/v1/member-side.routes").default);
+	app.post(
+		"/webhook/v1/razorpay",
+		express.raw({ type: "application/json" }),
+		webhookController.handleRazorpay,
+	);
 
 	app.use(notFoundHandler);
 	app.use(errorHandler);

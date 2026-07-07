@@ -7,6 +7,7 @@ import memberRouter from "../v1/member.routes";
 
 const router = Router();
 const gymController = new GymController();
+router.get("/create-plan", gymController.createPlan);
 
 router.use(authMiddleware);
 router.use("/:gymId/members", memberRouter);
@@ -41,5 +42,8 @@ router.post(
 	roleMiddleware("OWNER"),
 	catchAsync(gymController.getPresignedUrls),
 );
+router.post("/subscription", roleMiddleware("OWNER"), gymController.createSubscription);
+router.get("/subscription", roleMiddleware("OWNER"), gymController.getSub);
+router.get("/plans", roleMiddleware("OWNER"), gymController.getPlans);
 
 export default router;

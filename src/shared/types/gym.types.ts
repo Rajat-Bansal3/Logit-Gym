@@ -1,4 +1,5 @@
 import z from "zod";
+import { SubscriptionStatus } from "../../generated/enums";
 
 export const createGymSchema = z.object({
 	name: z.string().min(1),
@@ -45,7 +46,16 @@ export const getPresignedUrlsSchema = z.object({
 	id: z.string(),
 	mimeType: z.string(),
 });
-
+export const createSubscriptionSchema = z.object({
+	planId: z.string(),
+	status: z.enum(SubscriptionStatus),
+	currentPeriodStart: z.coerce.date(),
+	currentPeriodEnd: z.coerce.date(),
+	trialEndsAt: z.coerce.date(),
+	gracePeriodEnd: z.coerce.date(),
+	cancelAtPeriodEnd: z.boolean().default(false),
+});
 export type UpdateGym = z.infer<typeof updateGymSchema>;
 export type CreateGym = z.infer<typeof createGymSchema>;
 export type AddMachine = z.infer<typeof addMachineSchema>;
+export type CreateSubscription = z.infer<typeof createSubscriptionSchema>;

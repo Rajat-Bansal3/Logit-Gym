@@ -2,28 +2,37 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 import { env } from "../../env";
-import type { PrismaClient } from "../../generated/client";
+import type { Plan, PrismaClient } from "../../generated/client";
 import { AppError } from "../../shared/errors/app-errors";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
-import type { AddMachine, CreateGym, UpdateGym } from "../../shared/types/gym.types";
+import type {
+	AddMachine,
+	CreateGym,
+	CreateSubscription,
+	UpdateGym,
+} from "../../shared/types/gym.types";
 import type { BaseResponse } from "../../shared/types/returns";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
+import { createRZPSubscription } from "../../shared/utils/rzp";
 import { s3 } from "../../shared/utils/s3";
 import { ALLOWED_MIMETYPES } from "../../shared/utils/util_functions";
 import { GymRepository, type gym_with_profile } from "../repositories/gym.repository";
 import { MachineRepository } from "../repositories/machine.repository";
+import { type gym_with_sub, PlanRepository } from "../repositories/plan.repository";
 
 export class GymService {
 	private gymRepository: GymRepository;
 	private logger: AppLogger;
 	private machineRepository: MachineRepository;
+	private planRepository: PlanRepository;
 
 	constructor({ prisma = client }: { prisma: PrismaClient }) {
 		this.gymRepository = new GymRepository(prisma);
 		this.logger = new AppLogger();
 		this.machineRepository = new MachineRepository(prisma);
+		this.planRepository = new PlanRepository(prisma);
 	}
 
 	async createGym(
@@ -201,6 +210,108 @@ export class GymService {
 		);
 
 		return { presignedUrl, key };
+	};
+	getPlans = async (): Promise<BaseResponse<Plan[]>> => {
+		const plans = await this.planRepository.getPlans();
+		return {
+			message: "plans fetched successfully",
+			success: true,
+			data: plans,
+		};
+	};
+	getSub = async (gymId: string): Promise<BaseResponse<gym_with_sub>> => {
+		const currentSubscription = await this.planRepository.getSubscription(gymId);
+		return {
+			message: "subs fetched successfully",
+			success: true,
+			data: currentSubscription,
+		};
+	};
+	createGymSubscription = async (data: CreateSubscription, gymId: string) => {
+		const plan = await this.planRepository.getPlan(data.planId);
+		if (plan === null || plan === undefined) {
+			throw new GymError(GymErrorCode.NOT_FOUND, "plan with planId not found");
+		}
+		const existingSub = await this.planRepository.findActiveSubscription(gymId);
+		if (existingSub) {
+			throw new GymError(GymErrorCode.CONFLICT, "Gym already has an active subscription");
+		}
+		const subscription = await createRZPSubscription(plan.razorpayId, gymId);
+		await this.planRepository.createSub(plan.id, gymId, subscription.id);
+		return {
+			message: "successfully created subscription",
+			data: subscription.short_url,
+			success: true,
+		};
+	};
+	handleRazorpayWebhook = async (event: any): Promise<void> => {
+		const { event: eventType, payload } = event;
+
+		switch (eventType) {
+			case "subscription.activated":
+				await this.handleSubscriptionActivated(payload.subscription.entity);
+				break;
+			case "subscription.charged":
+				await this.handleSubscriptionCharged(payload.subscription.entity, payload.payment.entity);
+				break;
+			case "subscription.halted":
+				await this.handleSubscriptionHalted(payload.subscription.entity);
+				break;
+			case "subscription.cancelled":
+				await this.handleSubscriptionCancelled(payload.subscription.entity);
+				break;
+			case "subscription.pending":
+				await this.handleSubscriptionPending(payload.subscription.entity);
+				break;
+		}
+	};
+
+	private handleSubscriptionActivated = async (subscription: any): Promise<void> => {
+		const gymId = subscription.notes.gymId;
+
+		await this.planRepository.updateSubscription(subscription.id, gymId, {
+			status: "ACTIVE",
+			currentPeriodStart: new Date(subscription.current_start * 1000),
+			currentPeriodEnd: new Date(subscription.current_end * 1000),
+			gracePeriodEnd: null,
+		});
+	};
+
+	private handleSubscriptionCharged = async (subscription: any, payment: any): Promise<void> => {
+		// idempotency guard
+		const existing = await this.planRepository.findInvoiceByGatewayId(payment.id);
+		if (existing) {
+			return;
+		}
+
+		await this.planRepository.createInvoiceAndActivate({
+			gatewaySubscriptionId: subscription.id,
+			gymId: subscription.notes.gymId,
+			amount: payment.amount / 100,
+			paidDate: new Date(payment.created_at * 1000),
+			gatewayInvoiceId: payment.id,
+			currentPeriodStart: new Date(subscription.current_start * 1000),
+			currentPeriodEnd: new Date(subscription.current_end * 1000),
+		});
+	};
+
+	private handleSubscriptionHalted = async (subscription: any): Promise<void> => {
+		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+			status: "PAST_DUE",
+			gracePeriodEnd: new Date(Date.now() + 5 * 86_400_000),
+		});
+	};
+
+	private handleSubscriptionCancelled = async (subscription: any): Promise<void> => {
+		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+			status: "CANCELLED",
+		});
+	};
+
+	private handleSubscriptionPending = async (subscription: any): Promise<void> => {
+		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+			status: "PAST_DUE",
+		});
 	};
 
 	//private methods

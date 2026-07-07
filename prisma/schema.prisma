@@ -51,6 +51,21 @@ enum MembershipPlanType {
   YEARLY
 }
 
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -78,6 +93,11 @@ model Gym {
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
+
+  subscriptionStatus    SubscriptionStatus @default(TRIALING)
+  currentSubscriptionId String?            @unique
+  currentSubscription   Subscription?      @relation("CurrentSubscription", fields: [currentSubscriptionId], references: [id])
+  subscriptions         Subscription[]     @relation("GymSubscriptions")
 
   gymProfile       GymProfile?
   members          Member[]
@@ -402,4 +422,67 @@ model MemberMetrics {
   @@index([memberId])
   @@index([paymentStatus])
   @@map("member_metrics")
+}
+
+model Plan {
+  id           String       @id @default(cuid())
+  name         String
+  price        Float
+  billingCycle BillingCycle
+  razorpayId   String
+  aiReports    Boolean      @default(false)
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id     String             @id @default(cuid())
+  gymId  String
+  gym    Gym                @relation("GymSubscriptions", fields: [gymId], references: [id], onDelete: Restrict)
+  planId String
+  plan   Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status SubscriptionStatus @default(TRIALING)
+
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  trialEndsAt        DateTime?
+  gracePeriodEnd     DateTime?
+  cancelAtPeriodEnd  Boolean   @default(false)
+
+  gatewaySubscriptionId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoices      SubscriptionInvoice[]
+  currentForGym Gym?                  @relation("CurrentSubscription")
+
+  @@index([gymId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@map("subscriptions")
+}
+
+model SubscriptionInvoice {
+  id               String        @id @default(cuid())
+  subscriptionId   String
+  subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  amount           Float
+  status           PaymentStatus @default(PENDING)
+  dueDate          DateTime
+  paidDate         DateTime?
+  gatewayInvoiceId String?       @unique
+  hostedInvoiceUrl String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("subscription_invoices")
 }
