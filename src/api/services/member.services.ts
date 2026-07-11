@@ -59,18 +59,14 @@ export class MemberService {
 			);
 		}
 		let membershipCode = data.membershipCode;
-		if (gym.settings && gym.lastMemberShipCode && gym.settings.biometricPreference === "AUTO") {
-			membershipCode = gym.biometricCounter + 1;
+		if (gym.settings && gym.startingMemberShipCode && gym.settings.biometricPreference === "AUTO") {
+			membershipCode = gym.startingMemberShipCode + gym.biometricCounter;
 		}
 
 		if (!membershipCode) {
 			throw new MemberError(MemberErrorCode.BAD_REQUEST, "membership code not provided");
 		}
-		await this.gymRepository.update(
-			gymId,
-			{ membershipCode: membershipCode },
-			gym.settings?.biometricPreference === "AUTO",
-		);
+		await this.gymRepository.update(gymId, {}, gym.settings?.biometricPreference === "AUTO");
 		const member = await this.memberRepository.create(gymId, membershipCode, data);
 
 		if (data.isMachine && data.serialNumbers) {

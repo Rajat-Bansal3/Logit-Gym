@@ -96,8 +96,8 @@ model Gym {
   updatedAt DateTime @updatedAt
   isDeleted Boolean  @default(false)
 
-  biometricCounter   Int  @default(0)
-  lastMemberShipCode Int?
+  biometricCounter       Int  @default(0)
+  startingMemberShipCode Int?
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])

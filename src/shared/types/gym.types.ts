@@ -3,7 +3,7 @@ import { BioPref } from "../../generated/enums";
 export const createGymSchema = z.object({
 	name: z.string().min(1),
 	address: z.string().min(1),
-	lastMembershipCode: z.coerce.number().optional(),
+	startingMembershipCode: z.coerce.number().optional(),
 	profile: z.object({
 		timing: z.string(),
 		openDays: z.array(z.string()),

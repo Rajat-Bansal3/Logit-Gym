@@ -48,7 +48,7 @@ export class GymService {
 			address: data.address,
 			ownerId: user.id,
 			bioPref: data.settings.biometricCodePreference,
-			lastMembershipCode: data.lastMembershipCode,
+			startingMembershipCode: data.startingMembershipCode,
 		});
 
 		if (data.profile) {

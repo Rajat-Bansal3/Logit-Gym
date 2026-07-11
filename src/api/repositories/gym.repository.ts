@@ -35,7 +35,7 @@ export class GymRepository {
 		address: string;
 		ownerId: string;
 		bioPref: BioPref;
-		lastMembershipCode: number | undefined;
+		startingMembershipCode: number | undefined;
 	}): Promise<Gym> => {
 		const settings = await this.client.settings.create({
 			data: {
@@ -49,8 +49,8 @@ export class GymRepository {
 				ownerId: data.ownerId,
 				hash: `${data.name}-${crypto.randomUUID()}`,
 				settingsId: settings.id,
-				...(data.lastMembershipCode && {
-					lastMemberShipCode: data.lastMembershipCode,
+				...(data.startingMembershipCode && {
+					startingMembershipCode: data.startingMembershipCode,
 				}),
 			},
 		});
@@ -148,7 +148,6 @@ export class GymRepository {
 		data: {
 			name?: string;
 			address?: string;
-			membershipCode?: number;
 		},
 		autoIncr: boolean = false,
 	): Promise<void> => {
@@ -159,7 +158,6 @@ export class GymRepository {
 			data: {
 				...(data.name && { name: data.name }),
 				...(data.address && { address: data.address }),
-				...(data.membershipCode && { lastMemberShipCode: data.membershipCode }),
 				...(autoIncr && { biometricCounter: { increment: 1 } }),
 			},
 		});
