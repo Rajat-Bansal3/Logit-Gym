@@ -1,5 +1,6 @@
 import { env } from "../../env";
 import type { CheckInType, Gym, Payment, Prisma, PrismaClient } from "../../generated/client";
+import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
 import type {
@@ -13,6 +14,7 @@ import type { CreateMemberMembershipInput } from "../../shared/types/payment.typ
 import type { BaseResponse } from "../../shared/types/returns";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
+import { GymRepository } from "../repositories/gym.repository";
 import { MachineRepository } from "../repositories/machine.repository";
 import {
 	type AttendanceReport,
@@ -28,11 +30,13 @@ import {
 
 export class MemberService {
 	private readonly memberRepository: MemberRepository;
+	private readonly gymRepository: GymRepository;
 	private readonly machineRepository: MachineRepository;
 	private readonly logger: AppLogger;
 
 	constructor({ prisma = client }: { prisma: PrismaClient }) {
 		this.memberRepository = new MemberRepository(prisma);
+		this.gymRepository = new GymRepository(prisma);
 		this.logger = new AppLogger();
 		this.machineRepository = new MachineRepository(prisma);
 	}
@@ -43,7 +47,10 @@ export class MemberService {
 		_user: AuthenticatedUser,
 	): Promise<BaseResponse<{ memberId: string }>> {
 		this.logger.debug("onboardMember: checking for conflicts", { gymId });
-
+		const gym = await this.gymRepository.findById({ gymId, isDeleted: false });
+		if (!gym) {
+			throw new GymError(GymErrorCode.NOT_FOUND, "gym not found");
+		}
 		const existingPhone = await this.memberRepository.findByPhone(data.phone);
 		if (existingPhone) {
 			throw new MemberError(
@@ -51,20 +58,25 @@ export class MemberService {
 				"A member with this phone number already exists",
 			);
 		}
-
-		if (data.email) {
-			const existingEmail = await this.memberRepository.findByEmail(data.email);
-			if (existingEmail) {
-				throw new MemberError(MemberErrorCode.CONFLICT, "A member with this email already exists");
-			}
+		let membershipCode = data.membershipCode;
+		if (gym.settings && gym.lastMemberShipCode && gym.settings.biometricPreference === "AUTO") {
+			membershipCode = gym.biometricCounter + 1;
 		}
 
-		const member = await this.memberRepository.create(gymId, data);
+		if (!membershipCode) {
+			throw new MemberError(MemberErrorCode.BAD_REQUEST, "membership code not provided");
+		}
+		await this.gymRepository.update(
+			gymId,
+			{ membershipCode: membershipCode },
+			gym.settings?.biometricPreference === "AUTO",
+		);
+		const member = await this.memberRepository.create(gymId, membershipCode, data);
 
 		if (data.isMachine && data.serialNumbers) {
 			await this.machineRepository.addUser({
 				memberName: member.name,
-				biometricCode: member.biometricCode,
+				biometricCode: member.membershipCode,
 				apiKey: env.MACHINE_SERVER_API_KEY,
 				serialNumbers: data.serialNumbers,
 				cardNumber: data.cardNumber,
@@ -76,7 +88,7 @@ export class MemberService {
 			if (member.currentMembership?.endDate) {
 				await this.machineRepository.setUserExpiration({
 					apiKey: env.MACHINE_SERVER_API_KEY,
-					biometricCode: member.biometricCode,
+					biometricCode: member.membershipCode,
 					expirationDate: member.currentMembership?.endDate,
 					serialNumbers: data.serialNumbers,
 				});
@@ -139,7 +151,6 @@ export class MemberService {
 			throw new MemberError(MemberErrorCode.NOT_FOUND);
 		}
 
-		// Phone uniqueness check — only if phone is being changed
 		if (data.phone !== undefined && data.phone !== member.phone) {
 			const existingPhone = await this.memberRepository.findByPhone(data.phone);
 			if (existingPhone) {
@@ -147,14 +158,6 @@ export class MemberService {
 					MemberErrorCode.CONFLICT,
 					"A member with this phone number already exists",
 				);
-			}
-		}
-
-		// Email uniqueness check — only if email is being changed
-		if (data.email !== undefined && data.email !== null && data.email !== member.email) {
-			const existingEmail = await this.memberRepository.findByEmail(data.email);
-			if (existingEmail) {
-				throw new MemberError(MemberErrorCode.CONFLICT, "A member with this email already exists");
 			}
 		}
 
@@ -190,7 +193,7 @@ export class MemberService {
 			await this.machineRepository.toggleUserBlock({
 				apiKey: env.MACHINE_SERVER_API_KEY,
 				serialNumbers,
-				biometricCode: member.biometricCode,
+				biometricCode: member.membershipCode,
 				block: newStatus === "INACTIVE",
 			});
 		}
@@ -230,7 +233,7 @@ export class MemberService {
 			await this.machineRepository.removeUser({
 				apiKey: env.MACHINE_SERVER_API_KEY,
 				serialNumbers,
-				biometricCode: member.biometricCode,
+				biometricCode: member.membershipCode,
 			});
 		}
 
@@ -426,7 +429,7 @@ export class MemberService {
 		if (data.isMachine && data.serialNumber && membership.endDate) {
 			await this.machineRepository.setUserExpiration({
 				apiKey: env.MACHINE_SERVER_API_KEY,
-				biometricCode: membership.member.biometricCode,
+				biometricCode: membership.member.membershipCode,
 				expirationDate: membership.endDate,
 				serialNumbers: data.serialNumber,
 			});

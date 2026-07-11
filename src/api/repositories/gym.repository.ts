@@ -1,4 +1,5 @@
 import type { Gym, Prisma, PrismaClient } from "../../generated/client";
+import type { BioPref } from "../../generated/enums";
 import type { CreateGym, UpdateGym } from "../../shared/types/gym.types";
 
 type gym_including_owner = Prisma.GymGetPayload<{
@@ -29,13 +30,28 @@ export class GymRepository {
 			},
 		});
 	};
-	create = async (data: { name: string; address: string; ownerId: string }): Promise<Gym> => {
+	create = async (data: {
+		name: string;
+		address: string;
+		ownerId: string;
+		bioPref: BioPref;
+		lastMembershipCode: number | undefined;
+	}): Promise<Gym> => {
+		const settings = await this.client.settings.create({
+			data: {
+				biometricPreference: data.bioPref,
+			},
+		});
 		const gym = await this.client.gym.create({
 			data: {
 				name: data.name,
 				address: data.address,
 				ownerId: data.ownerId,
 				hash: `${data.name}-${crypto.randomUUID()}`,
+				settingsId: settings.id,
+				...(data.lastMembershipCode && {
+					lastMemberShipCode: data.lastMembershipCode,
+				}),
 			},
 		});
 		await this.client.gymMetrics.create({
@@ -43,6 +59,7 @@ export class GymRepository {
 				gymId: gym.id,
 			},
 		});
+
 		return gym;
 	};
 	createProfile = async (
@@ -111,11 +128,18 @@ export class GymRepository {
 	}: {
 		gymId: string;
 		isDeleted?: boolean;
-	}): Promise<Gym | null> => {
+	}): Promise<Prisma.GymGetPayload<{
+		include: {
+			settings: true;
+		};
+	}> | null> => {
 		return await this.client.gym.findUnique({
 			where: {
 				id: gymId,
 				isDeleted,
+			},
+			include: {
+				settings: true,
 			},
 		});
 	};
@@ -124,7 +148,9 @@ export class GymRepository {
 		data: {
 			name?: string;
 			address?: string;
+			membershipCode?: number;
 		},
+		autoIncr: boolean = false,
 	): Promise<void> => {
 		await this.client.gym.update({
 			where: {
@@ -133,6 +159,8 @@ export class GymRepository {
 			data: {
 				...(data.name && { name: data.name }),
 				...(data.address && { address: data.address }),
+				...(data.membershipCode && { lastMemberShipCode: data.membershipCode }),
+				...(autoIncr && { biometricCounter: { increment: 1 } }),
 			},
 		});
 	};

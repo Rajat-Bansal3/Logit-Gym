@@ -127,10 +127,6 @@ export class MemberRepository {
 		return this.prisma.member.findUnique({ where: { phone } });
 	}
 
-	async findByEmail(email: string): Promise<Member | null> {
-		return this.prisma.member.findUnique({ where: { email } });
-	}
-
 	async findByEmailAndGym(email: string, gymId: string): Promise<Member | null> {
 		return this.prisma.member.findFirst({ where: { email, gymId } });
 	}
@@ -184,7 +180,7 @@ export class MemberRepository {
 		return { members, total, page, limit };
 	}
 
-	async create(gymId: string, input: OnboardMember): Promise<MemberWithDetails> {
+	async create(gymId: string, lastCode: number, input: OnboardMember): Promise<MemberWithDetails> {
 		const endDate = computeMembershipEndDate(input.membershipStartDate, input.planType);
 
 		return this.prisma.$transaction(async (tx) => {
@@ -194,6 +190,7 @@ export class MemberRepository {
 					name: input.name,
 					dateOfBirth: input.dateOfBirth,
 					address: input.address,
+					membershipCode: lastCode,
 					phone: input.phone,
 					gender: input.gender,
 					age: computeAge(input.dateOfBirth),
@@ -731,7 +728,7 @@ export class MemberRepository {
 						member: {
 							select: {
 								gymId: true,
-								biometricCode: true,
+								membershipCode: true,
 							},
 						},
 					},

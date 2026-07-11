@@ -20,6 +20,8 @@ export const onboardMemberSchema = z.object({
 	emergencyContact: z.string().optional(),
 	avatarUrl: z.string().url().optional(),
 
+	membershipCode: z.coerce.number().optional(),
+
 	weight: z.number().positive().optional(),
 	height: z.number().positive().optional(),
 

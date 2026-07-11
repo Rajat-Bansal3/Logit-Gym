@@ -47,6 +47,8 @@ export class GymService {
 			name: data.name,
 			address: data.address,
 			ownerId: user.id,
+			bioPref: data.settings.biometricCodePreference,
+			lastMembershipCode: data.lastMembershipCode,
 		});
 
 		if (data.profile) {
@@ -165,7 +167,7 @@ export class GymService {
 
 	async addMachine(data: AddMachine, gymId: string): Promise<BaseResponse<null>> {
 		const resp = await this.machineRepository.addMachine({
-			apiKey: data.api_key,
+			apiKey: env.MACHINE_SERVER_API_KEY,
 			gymId: gymId,
 			machinename: data.machineName,
 			serialNumber: data.serialNumber,
@@ -177,7 +179,7 @@ export class GymService {
 	}
 	async removeMachine(data: AddMachine): Promise<BaseResponse<null>> {
 		const resp = await this.machineRepository.removeMachine({
-			apiKey: data.api_key,
+			apiKey: env.MACHINE_SERVER_API_KEY,
 			serialNumber: data.serialNumber,
 		});
 		return {
@@ -237,7 +239,7 @@ export class GymService {
 			throw new GymError(GymErrorCode.CONFLICT, "Gym already has an active subscription");
 		}
 		const subscription = await createRZPSubscription(plan.razorpayId, gymId);
-		await this.planRepository.createSub(plan.id, gymId, subscription.id);
+		await this.planRepository.createSub(gymId, plan.id, subscription.id);
 		return {
 			message: "successfully created subscription",
 			data: subscription.short_url,

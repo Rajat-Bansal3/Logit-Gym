@@ -15,7 +15,9 @@ router.use("/:gymId/members", memberRouter);
  * Create a new gym
  */
 router.post("/", roleMiddleware("OWNER"), catchAsync(gymController.createGym));
-
+router.get("/subscription", roleMiddleware("OWNER"), gymController.getSub);
+router.get("/plans", roleMiddleware("OWNER"), gymController.getPlans);
+router.post("/subscription", roleMiddleware("OWNER"), gymController.createSubscription);
 /**
  * Get gym details
  */
@@ -42,8 +44,5 @@ router.post(
 	roleMiddleware("OWNER"),
 	catchAsync(gymController.getPresignedUrls),
 );
-router.post("/subscription", roleMiddleware("OWNER"), gymController.createSubscription);
-router.get("/subscription", roleMiddleware("OWNER"), gymController.getSub);
-router.get("/plans", roleMiddleware("OWNER"), gymController.getPlans);
 
 export default router;

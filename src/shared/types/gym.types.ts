@@ -1,9 +1,9 @@
 import z from "zod";
-import { SubscriptionStatus } from "../../generated/enums";
-
+import { BioPref } from "../../generated/enums";
 export const createGymSchema = z.object({
 	name: z.string().min(1),
 	address: z.string().min(1),
+	lastMembershipCode: z.coerce.number().optional(),
 	profile: z.object({
 		timing: z.string(),
 		openDays: z.array(z.string()),
@@ -15,6 +15,9 @@ export const createGymSchema = z.object({
 		amenities: z.array(z.string()),
 		images: z.array(z.string()),
 		referralOffer: z.string(),
+	}),
+	settings: z.object({
+		biometricCodePreference: z.enum(BioPref).default("AUTO"),
 	}),
 });
 
@@ -40,7 +43,6 @@ export const updateGymSchema = z.object({
 export const addMachineSchema = z.object({
 	serialNumber: z.string().min(1).max(100),
 	machineName: z.string().min(1).max(100),
-	api_key: z.string().min(1).max(100),
 });
 export const getPresignedUrlsSchema = z.object({
 	id: z.string(),
@@ -48,12 +50,12 @@ export const getPresignedUrlsSchema = z.object({
 });
 export const createSubscriptionSchema = z.object({
 	planId: z.string(),
-	status: z.enum(SubscriptionStatus),
-	currentPeriodStart: z.coerce.date(),
-	currentPeriodEnd: z.coerce.date(),
-	trialEndsAt: z.coerce.date(),
-	gracePeriodEnd: z.coerce.date(),
-	cancelAtPeriodEnd: z.boolean().default(false),
+	// status: z.enum(SubscriptionStatus),
+	// currentPeriodStart: z.coerce.date(),
+	// currentPeriodEnd: z.coerce.date(),
+	// trialEndsAt: z.coerce.date(),
+	// gracePeriodEnd: z.coerce.date(),
+	// cancelAtPeriodEnd: z.boolean().default(false),
 });
 export type UpdateGym = z.infer<typeof updateGymSchema>;
 export type CreateGym = z.infer<typeof createGymSchema>;

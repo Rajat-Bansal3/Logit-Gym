@@ -66,6 +66,11 @@ enum BillingCycle {
   YEARLY
 }
 
+enum BioPref {
+  AUTO
+  MANUAL
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -91,6 +96,9 @@ model Gym {
   updatedAt DateTime @updatedAt
   isDeleted Boolean  @default(false)
 
+  biometricCounter   Int  @default(0)
+  lastMemberShipCode Int?
+
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
 
@@ -109,6 +117,8 @@ model Gym {
   gymReports       GymReport[]
   machines         Machines[]
   gymMetrics       GymMetrics?
+  settingsId       String
+  settings         Settings         @relation(fields: [settingsId], references: [id])
 
   @@unique([isDeleted, ownerId])
   @@map("gyms")
@@ -130,10 +140,12 @@ model Machines {
 }
 
 model Member {
-  id            String  @id @default(cuid())
-  userId        String? @unique
-  biometricCode Int     @default(autoincrement())
-  user          User?   @relation(fields: [userId], references: [id])
+  id     String  @id @default(cuid())
+  userId String? @unique
+
+  membershipCode Int
+
+  user User? @relation(fields: [userId], references: [id])
 
   gymId String
   gym   Gym    @relation(fields: [gymId], references: [id])
@@ -171,6 +183,7 @@ model Member {
   memberMetrics    MemberMetrics?
   memberMachines   MemberMachine[]
 
+  @@unique([gymId, membershipCode])
   @@index([gymId])
   @@index([status])
   @@index([joinDate])
@@ -485,4 +498,12 @@ model SubscriptionInvoice {
   @@index([status])
   @@index([dueDate])
   @@map("subscription_invoices")
+}
+
+model Settings {
+  id String @id @default(cuid())
+
+  biometricPreference BioPref @default(AUTO)
+
+  gyms Gym[]
 }

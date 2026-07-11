@@ -8,8 +8,16 @@ import type {
 
 export type gym_with_sub = Prisma.GymGetPayload<{
 	include: {
-		subscriptions: true;
-		currentSubscription: true;
+		subscriptions: {
+			include: {
+				plan: true;
+			};
+		};
+		currentSubscription: {
+			include: {
+				plan: true;
+			};
+		};
 	};
 }> | null;
 
@@ -34,8 +42,16 @@ export class PlanRepository {
 				id: gymId,
 			},
 			include: {
-				subscriptions: true,
-				currentSubscription: true,
+				subscriptions: {
+					include: {
+						plan: true,
+					},
+				},
+				currentSubscription: {
+					include: {
+						plan: true,
+					},
+				},
 			},
 		});
 		return gym_with_sub;

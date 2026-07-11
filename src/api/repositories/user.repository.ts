@@ -65,8 +65,16 @@ export class UserRepository {
 				role: true,
 				email: true,
 				password: true,
-				gym: { select: { id: true } },
-				member: { select: { id: true } },
+				member: {
+					select: {
+						id: true,
+					},
+				},
+				gym: {
+					select: {
+						id: true,
+					},
+				},
 			},
 		});
 	};
