@@ -14,10 +14,15 @@ export interface AuthResponse {
 }
 
 export const loginSchema = z.object({
+	username: z
+		.string()
+		.min(1, "username is required")
+		.transform((username) => username.toLowerCase()),
 	email: z
 		.string()
 		.min(1, "Email is required")
-		.transform((email) => email.toLowerCase().trim()),
+		.transform((email) => email.toLowerCase().trim())
+		.optional(),
 
 	password: z
 		.string()
@@ -27,11 +32,14 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const registerSchema = z.object({
+	username: z
+		.string()
+		.min(1, "username is required")
+		.transform((username) => username.toLowerCase().trim()),
 	email: z
 		.string()
-		.min(1, "Email is required")
-		.email("Invalid email format")
-		.transform((email) => email.toLowerCase().trim()),
+		.transform((email) => email.toLowerCase().trim())
+		.optional(),
 
 	password: z
 		.string()

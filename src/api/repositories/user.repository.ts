@@ -5,7 +5,7 @@ type UserEmailLookup = Prisma.UserGetPayload<{
 	select: {
 		id: true;
 		role: true;
-		email: true;
+		username: true;
 		password: true;
 		member: {
 			select: {
@@ -25,15 +25,16 @@ export class UserRepository {
 	constructor(client: PrismaClient) {
 		this.client = client;
 	}
-	getUserByEmail = async (email: string): Promise<UserEmailLookup | null> => {
+	getUserByUsername = async (username: string): Promise<UserEmailLookup | null> => {
+		console.log(username);
 		return this.client.user.findUnique({
 			where: {
-				email,
+				username,
 			},
 			select: {
 				id: true,
 				role: true,
-				email: true,
+				username: true,
 				password: true,
 				member: {
 					select: {
@@ -51,19 +52,20 @@ export class UserRepository {
 	createUser = async (data: RegisterInput): Promise<UserEmailLookup> => {
 		return this.client.user.create({
 			data: {
-				email: data.email,
+				...(data.email && { email: data.email }),
+				username: data.username,
 				password: data.password,
 				role: data.role,
 				...(data.role === "MEMBER" && {
 					member: {
-						connect: { email: data.email },
+						connect: { username: data.username },
 					},
 				}),
 			},
 			select: {
 				id: true,
 				role: true,
-				email: true,
+				username: true,
 				password: true,
 				member: {
 					select: {

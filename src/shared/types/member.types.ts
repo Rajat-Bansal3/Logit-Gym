@@ -15,7 +15,7 @@ export const onboardMemberSchema = z.object({
 	dateOfBirth: z.coerce.date(),
 	address: z.string().min(1),
 	phone: z.string().min(1),
-	email: z.string().email().optional(),
+	email: z.string().optional(),
 	gender: z.string().min(1),
 	emergencyContact: z.string().optional(),
 	avatarUrl: z.string().url().optional(),
@@ -60,11 +60,10 @@ export const updateMemberSchema = z.object({
 	weight: z.number().positive().nullable().optional(),
 	height: z.number().positive().nullable().optional(),
 	status: z.enum(MemberStatus).optional(),
-	dateOfBirth: z.coerce.date(),
+	dateOfBirth: z.coerce.date().optional(),
 });
 export const deleteMemberSchema = z.object({
 	serialNumbers: z.array(z.string()).optional(),
-	memberId: z.string(),
 	isMachine: z.boolean(),
 });
 
@@ -78,7 +77,7 @@ export const listMembersQuerySchema = z.object({
 });
 
 export const markAttendanceSchema = z.object({
-	gym_hash: z.string().min(1),
+	gym_hash: z.string().min(1).trim(),
 	day: daysEnum,
 });
 

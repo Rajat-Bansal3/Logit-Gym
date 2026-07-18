@@ -73,7 +73,8 @@ enum BioPref {
 
 model User {
   id        String   @id @default(cuid())
-  email     String   @unique
+  email     String?
+  username  String   @unique
   password  String
   role      UserRole
   createdAt DateTime @default(now())
@@ -82,6 +83,7 @@ model User {
   member Member?
   gym    Gym[]
 
+  @@index([username])
   @@index([email])
   @@index([role])
   @@map("users")
@@ -97,7 +99,7 @@ model Gym {
   isDeleted Boolean  @default(false)
 
   biometricCounter       Int  @default(0)
-  startingMemberShipCode Int?
+  startingMembershipCode Int?
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
@@ -151,12 +153,13 @@ model Member {
   gym   Gym    @relation(fields: [gymId], references: [id])
 
   name        String
-  dateOfBirth DateTime
-  address     String
-  phone       String   @unique
-  email       String?  @unique
+  username    String    @unique
+  dateOfBirth DateTime?
+  address     String?
+  phone       String?   @unique
+  email       String?   @unique
   avatarUrl   String?
-  gender      String
+  gender      String?
 
   emergencyContact String?
 

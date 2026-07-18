@@ -1,0 +1,825 @@
+{
+  "info": {
+    "_postman_id": "f4265a93-3937-4dd8-a4a5-25ee4f08614b",
+    "name": "manage_X",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "25254297"
+  },
+  "item": [
+    {
+      "name": "auth",
+      "item": [
+        {
+          "name": "signup",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\" : \"rajat45634_0\",\n    \"password\" : \"123456\",\n    \"role\" : \"OWNER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "signin",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{    \"username\" : \"rajat45634_0\",\n    \"password\" : \"123456\",\n    \"role\" : \"OWNER\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "gym",
+      "item": [
+        {
+          "name": "member",
+          "item": [
+            {
+              "name": "member_onboarding",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Kabul badmos\",\n  \"dateOfBirth\": \"1998-05-15\",\n  \"address\": \"123 MG Road, Delhi\",\n  \"phone\": \"9876543211\",\n  \"gender\": \"Male\",\n  \"planType\": \"MONTHLY\",\n  \"membershipStartDate\": \"2026-07-19\",\n  \"dueAmount\": 0,\n  \"membershipAmount\": 2500,\n  \"isMachine\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "{{gymId}}", "members", ""]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "get_members",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "{{gymId}}", "members", ""]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "get_member",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/cmrmhg8mi00006bum46nvc94s",
+                  "host": ["{{base_url}}"],
+                  "path": [
+                    "gym",
+                    "{{gymId}}",
+                    "members",
+                    "cmrmhg8mi00006bum46nvc94s"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "update_member",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"aarav.sharma@gmail.com\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/cmrmhg8mi00006bum46nvc94s",
+                  "host": ["{{base_url}}"],
+                  "path": [
+                    "gym",
+                    "{{gymId}}",
+                    "members",
+                    "cmrmhg8mi00006bum46nvc94s"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "deactivate_member",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"aarav.sharma@gmail.com\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/cmrmhg8mi00006bum46nvc94s",
+                  "host": ["{{base_url}}"],
+                  "path": [
+                    "gym",
+                    "{{gymId}}",
+                    "members",
+                    "cmrmhg8mi00006bum46nvc94s"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete_member",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isMachine\" : false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/delete/cmrmhg8mi00006bum46nvc94s",
+                  "host": ["{{base_url}}"],
+                  "path": [
+                    "gym",
+                    "{{gymId}}",
+                    "members",
+                    "delete",
+                    "cmrmhg8mi00006bum46nvc94s"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Overview Report",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isMachine\" : false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/reports/overview",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "{{gymId}}", "members", "reports", "overview"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "attendance Report",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isMachine\" : false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/reports/attendance",
+                  "host": ["{{base_url}}"],
+                  "path": [
+                    "gym",
+                    "{{gymId}}",
+                    "members",
+                    "reports",
+                    "attendance"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "metrics Report",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isMachine\" : false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/reports/metrics",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "{{gymId}}", "members", "reports", "metrics"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "get_membership",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isMachine\" : false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/cmrmhg8mi00006bum46nvc94s/membership",
+                  "host": ["{{base_url}}"],
+                  "path": [
+                    "gym",
+                    "{{gymId}}",
+                    "members",
+                    "cmrmhg8mi00006bum46nvc94s",
+                    "membership"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "create_membership",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"planType\": \"HALF_YEARLY\",\n  \"startDate\": \"2026-09-17\",\n  \"planName\": \"Premium Monthly\",\n  \"dueAmount\": 0,\n  \"membershipAmount\": 14000,\n  \"predecessor\": \"cmrqs1p150000uiumz44mezp1\",\n  \"isMachine\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}/members/cmrmhg8mi00006bum46nvc94s/membership",
+                  "host": ["{{base_url}}"],
+                  "path": [
+                    "gym",
+                    "{{gymId}}",
+                    "members",
+                    "cmrmhg8mi00006bum46nvc94s",
+                    "membership"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "exec": [""]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "exec": [""]
+              }
+            }
+          ]
+        },
+        {
+          "name": "owner",
+          "item": [
+            {
+              "name": "create_gym",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJtZzJwczIwMDAwcjd1bXY1dDI3cGEwIiwicm9sZSI6Ik9XTkVSIiwidXNlcklkIjoiY21ybWcycHMyMDAwMHI3dW12NXQyN3BhMCIsImlhdCI6MTc4NDE0MTk4OSwiZXhwIjoxNzg1NDM3OTg5fQ.hh_-ni6EtuuGVlmtmkgT57zoylB9JC9BoVPwB-T0xYQ",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Iron Forge Fitness\",\n  \"address\": \"123 MG Road, Bengaluru, Karnataka 560001\",\n  \"startingMembershipCode\": 1000,\n  \"profile\": {\n    \"timing\": \"6:00 AM - 10:00 PM\",\n    \"openDays\": [\n      \"Monday\",\n      \"Tuesday\",\n      \"Wednesday\",\n      \"Thursday\",\n      \"Friday\",\n      \"Saturday\"\n    ],\n    \"instagram\": \"https://instagram.com/ironforgefitness\",\n    \"genderAllowed\": \"All\",\n    \"ownerName\": \"Rajat Sharma\",\n    \"ownerContact\": \"+919876543210\",\n    \"fitnessProfession\": \"Certified Strength & Conditioning Coach\",\n    \"amenities\": [\n      \"Cardio Zone\",\n      \"Free Weights\",\n      \"Locker Room\",\n      \"Shower\",\n      \"Parking\",\n      \"Personal Training\",\n      \"Steam Bath\"\n    ],\n    \"images\": [\n      \"https://picsum.photos/id/237/1200/800\",\n      \"https://picsum.photos/id/1011/1200/800\",\n      \"https://picsum.photos/id/1040/1200/800\",\n      \"https://picsum.photos/id/1060/1200/800\"\n    ],\n    \"referralOffer\": \"Refer a friend and both receive 1 month free.\"\n  },\n  \"settings\": {\n    \"biometricCodePreference\": \"AUTO\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", ""]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "get_gym",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJtZzJwczIwMDAwcjd1bXY1dDI3cGEwIiwicm9sZSI6Ik9XTkVSIiwidXNlcklkIjoiY21ybWcycHMyMDAwMHI3dW12NXQyN3BhMCIsImlhdCI6MTc4NDE0MTk4OSwiZXhwIjoxNzg1NDM3OTg5fQ.hh_-ni6EtuuGVlmtmkgT57zoylB9JC9BoVPwB-T0xYQ",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/gym/cmrmgbahs0001liumvee5gf2a",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "cmrmgbahs0001liumvee5gf2a"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "get_plans",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJtZzJwczIwMDAwcjd1bXY1dDI3cGEwIiwicm9sZSI6Ik9XTkVSIiwidXNlcklkIjoiY21ybWcycHMyMDAwMHI3dW12NXQyN3BhMCIsImlhdCI6MTc4NDE0MTk4OSwiZXhwIjoxNzg1NDM3OTg5fQ.hh_-ni6EtuuGVlmtmkgT57zoylB9JC9BoVPwB-T0xYQ",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/gym/plans",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "plans"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "get_subscriptions",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJtZzJwczIwMDAwcjd1bXY1dDI3cGEwIiwicm9sZSI6Ik9XTkVSIiwidXNlcklkIjoiY21ybWcycHMyMDAwMHI3dW12NXQyN3BhMCIsImlhdCI6MTc4NDE0MTk4OSwiZXhwIjoxNzg1NDM3OTg5fQ.hh_-ni6EtuuGVlmtmkgT57zoylB9JC9BoVPwB-T0xYQ",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/gym/subscription",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "subscription"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "patch_gym",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJtZzJwczIwMDAwcjd1bXY1dDI3cGEwIiwicm9sZSI6Ik9XTkVSIiwidXNlcklkIjoiY21ybWcycHMyMDAwMHI3dW12NXQyN3BhMCIsImlhdCI6MTc4NDE0MTk4OSwiZXhwIjoxNzg1NDM3OTg5fQ.hh_-ni6EtuuGVlmtmkgT57zoylB9JC9BoVPwB-T0xYQ",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Iron Forge Fitness Elite\",\n  \"profile\": {\n    \"timing\": \"5:30 AM - 11:00 PM\",\n    \"instagram\": \"https://instagram.com/ironforgeelite\",\n    \"ownerContact\": \"+919812345678\",\n    \"amenities\": [\n      \"Cardio Zone\",\n      \"Free Weights\",\n      \"CrossFit Area\",\n      \"Locker Room\",\n      \"Steam Bath\",\n      \"Cafe\"\n    ],\n    \"images\": [\n      \"https://picsum.photos/id/237/1200/800\",\n      \"https://picsum.photos/id/1011/1200/800\",\n      \"https://picsum.photos/id/1040/1200/800\",\n      \"https://picsum.photos/id/1060/1200/800\",\n      \"https://picsum.photos/id/1084/1200/800\"\n    ],\n    \"referralOffer\": \"Refer 2 friends and get 2 months free.\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "{{gymId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete_gym",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJtZzJwczIwMDAwcjd1bXY1dDI3cGEwIiwicm9sZSI6Ik9XTkVSIiwidXNlcklkIjoiY21ybWcycHMyMDAwMHI3dW12NXQyN3BhMCIsImlhdCI6MTc4NDE0MTk4OSwiZXhwIjoxNzg1NDM3OTg5fQ.hh_-ni6EtuuGVlmtmkgT57zoylB9JC9BoVPwB-T0xYQ",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Iron Forge Fitness Elite\",\n  \"profile\": {\n    \"timing\": \"5:30 AM - 11:00 PM\",\n    \"instagram\": \"https://instagram.com/ironforgeelite\",\n    \"ownerContact\": \"+919812345678\",\n    \"amenities\": [\n      \"Cardio Zone\",\n      \"Free Weights\",\n      \"CrossFit Area\",\n      \"Locker Room\",\n      \"Steam Bath\",\n      \"Cafe\"\n    ],\n    \"images\": [\n      \"https://picsum.photos/id/237/1200/800\",\n      \"https://picsum.photos/id/1011/1200/800\",\n      \"https://picsum.photos/id/1040/1200/800\",\n      \"https://picsum.photos/id/1060/1200/800\",\n      \"https://picsum.photos/id/1084/1200/800\"\n    ],\n    \"referralOffer\": \"Refer 2 friends and get 2 months free.\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/{{gymId}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "{{gymId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "add_machine",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJtZzJwczIwMDAwcjd1bXY1dDI3cGEwIiwicm9sZSI6Ik9XTkVSIiwidXNlcklkIjoiY21ybWcycHMyMDAwMHI3dW12NXQyN3BhMCIsImlhdCI6MTc4NDE0MTk4OSwiZXhwIjoxNzg1NDM3OTg5fQ.hh_-ni6EtuuGVlmtmkgT57zoylB9JC9BoVPwB-T0xYQ",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"serialNumber\" : \"skjdhbf192833q2ukds\",\n    \"machineName\" : \"test machine\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/add-machine",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "add-machine"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete_machine",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJtZzJwczIwMDAwcjd1bXY1dDI3cGEwIiwicm9sZSI6Ik9XTkVSIiwidXNlcklkIjoiY21ybWcycHMyMDAwMHI3dW12NXQyN3BhMCIsImlhdCI6MTc4NDE0MTk4OSwiZXhwIjoxNzg1NDM3OTg5fQ.hh_-ni6EtuuGVlmtmkgT57zoylB9JC9BoVPwB-T0xYQ",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"serialNumber\" : \"skjdhbf192833q2ukds\",\n    \"machineName\" : \"test machine\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/gym/delete-machine",
+                  "host": ["{{base_url}}"],
+                  "path": ["gym", "delete-machine"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "payments",
+          "item": [
+            {
+              "name": "get_payments",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/payments/gyms/{{gymId}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["payments", "gyms", "{{gymId}}", ""]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "add_payment",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 2500,\n  \"paidDate\": \"2026-07-19\",\n  \"description\": \"protien box sold\",\n  \"method\": \"CASH\",\n  \"transactionType\": \"CREDIT\",\n  \"category\": \"protien\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/payments/gyms/{{gymId}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["payments", "gyms", "{{gymId}}", ""]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete_payment",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 2500,\n  \"paidDate\": \"2026-07-19\",\n  \"description\": \"protien box sold\",\n  \"method\": \"CASH\",\n  \"transactionType\": \"CREDIT\",\n  \"category\": \"protien\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/payments/gyms/{{gymId}}/payments/cmrqt2ijf0002x2um5ow8hr4h",
+                  "host": ["{{base_url}}"],
+                  "path": [
+                    "payments",
+                    "gyms",
+                    "{{gymId}}",
+                    "payments",
+                    "cmrqt2ijf0002x2um5ow8hr4h"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "member",
+      "item": [
+        {
+          "name": "get member attendace",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/member/attendance/members",
+              "host": ["{{base_url}}"],
+              "path": ["member", "attendance", "members"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get member gym",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/member/gym",
+              "host": ["{{base_url}}"],
+              "path": ["member", "gym"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get member payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/member/payments",
+              "host": ["{{base_url}}"],
+              "path": ["member", "payments"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get member profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/member/profile",
+              "host": ["{{base_url}}"],
+              "path": ["member", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get member dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/member/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["member", "dashboard"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get gym occupancy",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/member/occupancy",
+              "host": ["{{base_url}}"],
+              "path": ["member", "occupancy"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "mark attendance",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"gym_hash\" : \"Iron Forge Fitness-7d39e125-0b59-4b2f-9c03-3374b6e523d1\",\n    \"day\" : \"sunday\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/member/attendance",
+              "host": ["{{base_url}}"],
+              "path": ["member", "attendance"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJxdzRnMW8wMDAxbTF1bTEwbXd1cjJnIiwicm9sZSI6Ik1FTUJFUiIsInVzZXJJZCI6ImNtcnF3NGcxbzAwMDFtMXVtMTBtd3VyMmciLCJneW1JZCI6ImNtcm1nYmFoczAwMDFsaXVtdmVlNWdmMmEiLCJtZW1iZXJJZCI6ImNtcnF3NGZ5eDAwMDBtMXVteW9maWEyNzUiLCJpYXQiOjE3ODQ0MTA4NDUsImV4cCI6MTc4NTcwNjg0NX0.5bp72BkOwC0oU9ksHVBsIBCCblXcKc_JsNQdK3mhcJQ",
+            "type": "string"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [""]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [""]
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXJtZzJwczIwMDAwcjd1bXY1dDI3cGEwIiwicm9sZSI6Ik9XTkVSIiwidXNlcklkIjoiY21ybWcycHMyMDAwMHI3dW12NXQyN3BhMCIsImlhdCI6MTc4NDE0MTk4OSwiZXhwIjoxNzg1NDM3OTg5fQ.hh_-ni6EtuuGVlmtmkgT57zoylB9JC9BoVPwB-T0xYQ",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [""]
+      }
+    }
+  ]
+}

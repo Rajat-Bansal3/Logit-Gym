@@ -34,7 +34,6 @@ router.get("/reports/overview", roleMiddleware("OWNER"), controller.getGymOvervi
 
 router.get("/reports/attendance", roleMiddleware("OWNER"), controller.getAttendanceReport);
 
-// TODO
 router.get("/reports/metrics", roleMiddleware("OWNER"), controller.getMemberMetricsReport);
 
 router.get("/:memberId/membership", controller.getMemberMembership);

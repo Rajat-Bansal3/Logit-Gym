@@ -20,6 +20,7 @@ import {
 } from "../../shared/types/member.types";
 import type { CreateMemberMembershipInput } from "../../shared/types/payment.types";
 import { computeAge, computeMembershipEndDate } from "../../shared/utils/util_functions";
+import { AuthService } from "../services/auth.service";
 
 export type MemberWithDetails = Member & {
 	currentMembership: Membership | null;
@@ -121,14 +122,13 @@ export type MemberAttendanceOut = Prisma.AttendanceLogGetPayload<{
 }>[];
 
 export class MemberRepository {
-	constructor(private readonly prisma: PrismaClient) {}
+	private authService: AuthService;
+	constructor(private readonly prisma: PrismaClient) {
+		this.authService = new AuthService();
+	}
 
 	async findByPhone(phone: string): Promise<Member | null> {
 		return this.prisma.member.findUnique({ where: { phone } });
-	}
-
-	async findByEmailAndGym(email: string, gymId: string): Promise<Member | null> {
-		return this.prisma.member.findFirst({ where: { email, gymId } });
 	}
 
 	async findByPhoneAndGym(phone: string, gymId: string): Promise<Member | null> {
@@ -153,7 +153,7 @@ export class MemberRepository {
 				OR: [
 					{ name: { contains: search, mode: "insensitive" } },
 					{ phone: { contains: search } },
-					{ email: { contains: search, mode: "insensitive" } },
+					{ username: { contains: search, mode: "insensitive" } },
 				],
 			}),
 			...(isMachine === true &&
@@ -184,10 +184,15 @@ export class MemberRepository {
 		const endDate = computeMembershipEndDate(input.membershipStartDate, input.planType);
 
 		return this.prisma.$transaction(async (tx) => {
+			const rand = crypto.randomUUID();
+			const username = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
+			const password = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
+
 			const member = await tx.member.create({
 				data: {
 					gymId,
 					name: input.name,
+					username: username,
 					dateOfBirth: input.dateOfBirth,
 					address: input.address,
 					membershipCode: lastCode,
@@ -201,6 +206,18 @@ export class MemberRepository {
 					...(input.weight !== undefined && { weight: input.weight }),
 					...(input.height !== undefined && { height: input.height }),
 					...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
+				},
+			});
+			await tx.user.create({
+				data: {
+					...(input.email && { email: input.email }),
+					username: username,
+					password: await this.authService.hashPassword(password),
+					role: "MEMBER",
+
+					member: {
+						connect: { username: username },
+					},
 				},
 			});
 			if (input.isMachine && input.serialNumbers && input.serialNumbers?.length > 0) {
@@ -285,7 +302,7 @@ export class MemberRepository {
 				}),
 				...(input.weight !== undefined && { weight: input.weight ?? null }),
 				...(input.height !== undefined && { height: input.height ?? null }),
-				age: computeAge(input.dateOfBirth),
+				...(input.dateOfBirth && { age: computeAge(input.dateOfBirth) }),
 			},
 			include: memberWithDetails,
 		});
@@ -327,11 +344,7 @@ export class MemberRepository {
 			include: {
 				user: true;
 				currentMembership: true;
-				gym: {
-					include: {
-						gymProfile: true;
-					};
-				};
+				gym: { include: { gymProfile: true } };
 			};
 		}>,
 		day: daysEnumType,
@@ -349,12 +362,28 @@ export class MemberRepository {
 				mem_metrics?.lastCheckIn ?? null,
 			);
 
-			await tx.memberMetrics.update({
+			const totalCheckIns = (mem_metrics?.totalCheckIns ?? 0) + (alreadyCheckedInToday ? 0 : 1);
+			const daysSinceJoin = Math.max(
+				1,
+				Math.ceil((log.timestamp.getTime() - member.joinDate.getTime()) / 86_400_000),
+			);
+			const attendancePercentage = Math.min(100, (totalCheckIns / daysSinceJoin) * 100);
+
+			await tx.memberMetrics.upsert({
 				where: { memberId: member.id },
-				data: {
+				create: {
+					memberId: member.id,
 					lastCheckIn: log.timestamp,
-					totalCheckIns: { increment: 1 },
+					totalCheckIns: 1,
 					currentStreak: newStreak,
+					attendancePercentage,
+					lastUpdated: new Date(),
+				},
+				update: {
+					lastCheckIn: log.timestamp,
+					...(alreadyCheckedInToday ? {} : { totalCheckIns: { increment: 1 } }),
+					currentStreak: newStreak,
+					attendancePercentage,
 					lastUpdated: new Date(),
 				},
 			});
@@ -367,10 +396,66 @@ export class MemberRepository {
 					where: { id: member.id },
 					data: { attendanceAggregate: aggregate },
 				});
+
+				const weekStart = this.getWeekStart(log.timestamp);
+				const dayIncrement: Record<string, unknown> = {
+					[day]: { increment: 1 },
+				};
+				const dayCreate: Record<string, unknown> = { [day]: 1 };
+
+				await tx.weeklyActivity.upsert({
+					where: { memberId_weekStart: { memberId: member.id, weekStart } },
+					create: {
+						memberId: member.id,
+						gymId: member.gymId,
+						weekStart,
+						...dayCreate,
+					} as Prisma.WeeklyActivityUncheckedCreateInput,
+					update: dayIncrement as Prisma.WeeklyActivityUpdateInput,
+				});
+
+				await tx.gymMetrics.upsert({
+					where: { gymId: member.gymId },
+					create: {
+						gymId: member.gymId,
+						currentOccupancy: 1,
+						lastUpdated: new Date(),
+					},
+					update: {
+						currentOccupancy: { increment: 1 },
+						lastUpdated: new Date(),
+					},
+				});
 			}
+
+			const dateOnly = new Date(
+				Date.UTC(
+					log.timestamp.getUTCFullYear(),
+					log.timestamp.getUTCMonth(),
+					log.timestamp.getUTCDate(),
+				),
+			);
+			const hour = log.timestamp.getUTCHours();
+
+			await tx.hourlyTraffic.upsert({
+				where: {
+					gymId_date_hour: { gymId: member.gymId, date: dateOnly, hour },
+				},
+				create: { gymId: member.gymId, date: dateOnly, hour, count: 1 },
+				update: { count: { increment: 1 } },
+			});
 
 			return log;
 		});
+	}
+
+	private getWeekStart(date: Date): Date {
+		const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+		const dow = d.getUTCDay(); // 0 = Sun ... 6 = Sat
+		const diffToMonday = dow === 0 ? -6 : 1 - dow;
+		d.setUTCDate(d.getUTCDate() + diffToMonday);
+		d.setUTCHours(0, 0, 0, 0);
+		return d;
 	}
 
 	async getGymOverviewReport(gymId: string, query: ReportQuery): Promise<GymOverviewReport> {
@@ -387,7 +472,7 @@ export class MemberRepository {
 			}),
 			this.prisma.member.groupBy({
 				by: ["status"],
-				where: { gymId },
+				where: { gymId, isDeleted: false },
 				orderBy: { status: "asc" },
 				_count: true,
 			}),
@@ -395,6 +480,7 @@ export class MemberRepository {
 				where: {
 					gymId,
 					...(hasDateFilter && { createdAt: dateFilter }),
+					isDeleted: false,
 				},
 			}),
 		]);
@@ -496,7 +582,7 @@ export class MemberRepository {
 
 		const [averages, topAttendees, churnRisk, paymentStatusBreakdown] = await Promise.all([
 			this.prisma.memberMetrics.aggregate({
-				where: { member: { gymId, status: "ACTIVE" } },
+				where: { member: { gymId, status: "ACTIVE", isDeleted: false } },
 				_avg: {
 					attendancePercentage: true,
 					currentStreak: true,
@@ -504,7 +590,7 @@ export class MemberRepository {
 			}),
 
 			this.prisma.memberMetrics.findMany({
-				where: { member: { gymId, status: "ACTIVE" } },
+				where: { member: { gymId, status: "ACTIVE", isDeleted: false } },
 				orderBy: { attendancePercentage: "desc" },
 				take: 10,
 				include: {
@@ -514,7 +600,7 @@ export class MemberRepository {
 
 			this.prisma.memberMetrics.findMany({
 				where: {
-					member: { gymId, status: "ACTIVE" },
+					member: { gymId, status: "ACTIVE", isDeleted: false },
 					OR: [{ lastCheckIn: { lt: sevenDaysAgo } }, { lastCheckIn: null }],
 				},
 				orderBy: { lastCheckIn: "asc" },
@@ -526,7 +612,7 @@ export class MemberRepository {
 
 			this.prisma.memberMetrics.groupBy({
 				by: ["paymentStatus"],
-				where: { member: { gymId } },
+				where: { member: { gymId, isDeleted: false } },
 				_count: { paymentStatus: true },
 			}),
 		]);
@@ -746,6 +832,7 @@ export class MemberRepository {
 						amount: data.membershipAmount,
 						description: "membership payment",
 						memberId: memberId,
+						membershipId: curr_membership.id,
 						gymId: curr_membership.member.gymId,
 						category: "Membership",
 					},

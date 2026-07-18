@@ -21,7 +21,8 @@ export class AuthService {
 	}
 
 	async login(data: LoginInput): Promise<BaseResponse<loginReturnType>> {
-		const user = await this.userRepository.getUserByEmail(data.email);
+		const user = await this.userRepository.getUserByUsername(data.username);
+		console.log(user);
 		if (!user || user === null) {
 			throw new AuthError(AuthErrorCode.FORBIDDEN, "invalid credentials");
 		}
@@ -37,7 +38,7 @@ export class AuthService {
 			data: {
 				user: {
 					id: user.id,
-					email: user.email,
+					username: user.username,
 					role: user.role,
 					...(user.role === "MEMBER" && { memberId: user.member?.id }),
 					...(user.role === "OWNER" && user.gym && { gymId: user.gym[0]?.id }),
@@ -47,12 +48,13 @@ export class AuthService {
 		};
 	}
 	async register(data: RegisterInput): Promise<BaseResponse<registerReturnType>> {
-		const user = await this.userRepository.getUserByEmail(data.email);
+		const user = await this.userRepository.getUserByUsername(data.username);
 		if (user) {
-			throw new AuthError(AuthErrorCode.FORBIDDEN, "email already exists");
+			throw new AuthError(AuthErrorCode.FORBIDDEN, "username already exists");
 		}
 		const pass = await this.hashPassword(data.password);
 		const newUser = await this.userRepository.createUser({
+			username: data.username,
 			email: data.email,
 			password: pass,
 			role: data.role,
@@ -64,7 +66,7 @@ export class AuthService {
 			data: {
 				user: {
 					id: newUser.id,
-					email: newUser.email,
+					username: newUser.username,
 					role: newUser.role,
 				},
 				tokens: { ...tokens },
@@ -117,7 +119,7 @@ export class AuthService {
 	private async comparePassword(password: string, hash: string): Promise<boolean> {
 		return bcrypt.compare(password, hash);
 	}
-	private async hashPassword(password: string): Promise<string> {
+	async hashPassword(password: string): Promise<string> {
 		return bcrypt.hash(password, env.SALT);
 	}
 	async validateAccessToken(token: string): Promise<ValidateAccessTokenResult> {

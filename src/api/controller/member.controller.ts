@@ -197,15 +197,15 @@ export class MemberController {
 			});
 
 			const user = req.user;
-			const { gymId } = req.params;
-			if (!user || !gymId || Array.isArray(gymId)) {
+			const { gymId, memberId } = req.params;
+			if (!user || !gymId || Array.isArray(gymId) || !memberId || Array.isArray(memberId)) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 
 			const data = deleteMemberSchema.parse(req.body);
 
-			const result = await this.memberService.deleteMember(
-				data.memberId,
+			await this.memberService.deleteMember(
+				memberId,
 				gymId,
 				data.serialNumbers,
 				data.isMachine,
@@ -214,9 +214,9 @@ export class MemberController {
 
 			this.logger.debug("deactivateMember: completed", {
 				gymId,
-				memberId: data.memberId,
+				memberId: memberId,
 			});
-			res.status(200).json(result);
+			res.status(204).json({});
 		} catch (error) {
 			this.logger.error("deactivateMember: error", {
 				gymId: req.params.gymId,

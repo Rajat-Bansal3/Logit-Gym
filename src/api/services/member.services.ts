@@ -59,8 +59,8 @@ export class MemberService {
 			);
 		}
 		let membershipCode = data.membershipCode;
-		if (gym.settings && gym.startingMemberShipCode && gym.settings.biometricPreference === "AUTO") {
-			membershipCode = gym.startingMemberShipCode + gym.biometricCounter;
+		if (gym.settings && gym.startingMembershipCode && gym.settings.biometricPreference === "AUTO") {
+			membershipCode = gym.startingMembershipCode + gym.biometricCounter;
 		}
 
 		if (!membershipCode) {

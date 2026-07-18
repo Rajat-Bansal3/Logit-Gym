@@ -13,7 +13,7 @@ export const loginReturn = z.object({
 	}),
 	user: z.object({
 		id: z.string(),
-		email: z.string(),
+		username: z.string(),
 		role: z.enum(UserRole),
 		gymId: z.string().optional(),
 		memberId: z.string().optional(),
