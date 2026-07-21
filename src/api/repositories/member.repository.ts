@@ -143,8 +143,43 @@ export class MemberRepository {
 	}
 
 	async listByGym(gymId: string, query: ListMembersQuery): Promise<MemberListResult> {
-		const { status, search, page, limit, isMachine, serialNumber } = query;
+		const { status, search, page, limit, isMachine, serialNumber, category } = query;
 		const skip = (page - 1) * limit;
+
+		const now = new Date();
+		const tenDaysFromNow = new Date();
+		tenDaysFromNow.setDate(now.getDate() + 10);
+
+		let membershipFilter: Prisma.MembershipWhereInput | undefined;
+		switch (category) {
+			case "active":
+				membershipFilter = {
+					endDate: {
+						gt: tenDaysFromNow,
+					},
+				};
+				break;
+
+			case "expiring":
+				membershipFilter = {
+					endDate: {
+						gte: now,
+						lte: tenDaysFromNow,
+					},
+				};
+				break;
+
+			case "expired":
+				membershipFilter = {
+					endDate: {
+						lt: now,
+					},
+				};
+				break;
+
+			default:
+				break;
+		}
 
 		const where: Prisma.MemberWhereInput = {
 			gymId,
@@ -164,6 +199,10 @@ export class MemberRepository {
 						},
 					},
 				}),
+			...(membershipFilter && {
+				currentMembership: membershipFilter,
+			}),
+			...(category === "deleted" ? { isDeleted: true } : { isDeleted: false }),
 		};
 
 		const [members, total] = await this.prisma.$transaction([
