@@ -242,16 +242,18 @@ model Membership {
 }
 
 model AttendanceLog {
-  id        String      @id @default(cuid())
-  memberId  String
-  member    Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  gymId     String
-  gym       Gym         @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  type      CheckInType
-  timestamp DateTime    @default(now())
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id             String      @id @default(cuid())
+  membershipCode Int
+  memberId       String
+  member         Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  gymId          String
+  gym            Gym         @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  type           CheckInType
+  timestamp      DateTime    @default(now())
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
+  @@unique([membershipCode, gymId, timestamp])
   @@index([memberId])
   @@index([gymId])
   @@index([timestamp])

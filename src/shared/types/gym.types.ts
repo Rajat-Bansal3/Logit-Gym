@@ -57,7 +57,12 @@ export const createSubscriptionSchema = z.object({
 	// gracePeriodEnd: z.coerce.date(),
 	// cancelAtPeriodEnd: z.boolean().default(false),
 });
+export const syncDataSchema = z.object({
+	date: z.string(),
+	serialNumber: z.array(z.string()),
+});
 export type UpdateGym = z.infer<typeof updateGymSchema>;
 export type CreateGym = z.infer<typeof createGymSchema>;
 export type AddMachine = z.infer<typeof addMachineSchema>;
 export type CreateSubscription = z.infer<typeof createSubscriptionSchema>;
+export type SyncData = z.infer<typeof syncDataSchema>;

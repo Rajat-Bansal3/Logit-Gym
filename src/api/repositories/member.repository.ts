@@ -223,7 +223,7 @@ export class MemberRepository {
 		const endDate = computeMembershipEndDate(input.membershipStartDate, input.planType);
 
 		return this.prisma.$transaction(async (tx) => {
-			const rand = crypto.randomUUID();
+			const rand = crypto.randomUUID().split("-")[0];
 			const username = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
 			const password = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
 
@@ -390,12 +390,18 @@ export class MemberRepository {
 	): Promise<AttendanceLog> {
 		return this.prisma.$transaction(async (tx) => {
 			const log = await tx.attendanceLog.create({
-				data: { gymId: member.gymId, memberId: member.id, type: "IN" },
+				data: {
+					gymId: member.gymId,
+					memberId: member.id,
+					type: "IN",
+					membershipCode: member.membershipCode,
+				},
 			});
 
 			const mem_metrics = await tx.memberMetrics.findUnique({
 				where: { memberId: member.id },
 			});
+
 			const { newStreak, alreadyCheckedInToday } = this.getStreakUpdate(
 				mem_metrics?.currentStreak ?? 0,
 				mem_metrics?.lastCheckIn ?? null,
@@ -489,7 +495,7 @@ export class MemberRepository {
 	}
 
 	private getWeekStart(date: Date): Date {
-		const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+		const d = new Date(Date.UTC(date.getFullYear(), date.getUTCMonth(), date.getUTCDate()));
 		const dow = d.getUTCDay(); // 0 = Sun ... 6 = Sat
 		const diffToMonday = dow === 0 ? -6 : 1 - dow;
 		d.setUTCDate(d.getUTCDate() + diffToMonday);
@@ -884,7 +890,7 @@ export class MemberRepository {
 		);
 		return curr_membership;
 	}
-	getStreakUpdate(
+	private getStreakUpdate(
 		currentStreak: number,
 		lastCheckIn: Date | null,
 	): { newStreak: number; alreadyCheckedInToday: boolean } {
@@ -918,5 +924,19 @@ export class MemberRepository {
 			return { newStreak: currentStreak + 1, alreadyCheckedInToday: false };
 		}
 		return { newStreak: 1, alreadyCheckedInToday: false };
+	}
+	async getMembers(memberCodes: number[], gymId: string) {
+		return await this.prisma.member.findMany({
+			where: {
+				membershipCode: {
+					in: memberCodes,
+				},
+				gymId,
+			},
+			select: {
+				id: true,
+				membershipCode: true,
+			},
+		});
 	}
 }

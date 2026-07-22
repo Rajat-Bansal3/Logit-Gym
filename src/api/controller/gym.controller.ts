@@ -5,6 +5,7 @@ import {
 	createGymSchema,
 	createSubscriptionSchema,
 	getPresignedUrlsSchema,
+	syncDataSchema,
 	updateGymSchema,
 } from "../../shared/types/gym.types";
 import { AppLogger } from "../../shared/utils/logger";
@@ -196,6 +197,19 @@ export class GymController {
 		} catch (error) {
 			next(error);
 			return;
+		}
+	};
+	syncAttendance = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const data = syncDataSchema.parse(req.body);
+			const user = req.user;
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "gym id not found");
+			}
+			const ok = await this.gymService.syncAttendance(data, user.gymId);
+			res.status(200).json(ok);
+		} catch (error) {
+			next(error);
 		}
 	};
 }

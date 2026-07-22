@@ -2,7 +2,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 import { env } from "../../env";
-import type { Plan, PrismaClient } from "../../generated/client";
+import type { CheckInType, Plan, PrismaClient } from "../../generated/client";
 import { AppError } from "../../shared/errors/app-errors";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
@@ -10,6 +10,7 @@ import type {
 	AddMachine,
 	CreateGym,
 	CreateSubscription,
+	SyncData,
 	UpdateGym,
 } from "../../shared/types/gym.types";
 import type { BaseResponse } from "../../shared/types/returns";
@@ -18,8 +19,10 @@ import { client } from "../../shared/utils/prisma";
 import { createRZPSubscription } from "../../shared/utils/rzp";
 import { s3 } from "../../shared/utils/s3";
 import { ALLOWED_MIMETYPES } from "../../shared/utils/util_functions";
+import { BulkRepository, type createManyAttendanceType } from "../repositories/bulk.repository";
 import { GymRepository, type gym_with_profile } from "../repositories/gym.repository";
 import { MachineRepository } from "../repositories/machine.repository";
+import { MemberRepository } from "../repositories/member.repository";
 import { type gym_with_sub, PlanRepository } from "../repositories/plan.repository";
 
 export class GymService {
@@ -27,12 +30,16 @@ export class GymService {
 	private logger: AppLogger;
 	private machineRepository: MachineRepository;
 	private planRepository: PlanRepository;
+	private bulkRepository: BulkRepository;
+	private memberRepository: MemberRepository;
 
 	constructor({ prisma = client }: { prisma: PrismaClient }) {
 		this.gymRepository = new GymRepository(prisma);
 		this.logger = new AppLogger();
 		this.machineRepository = new MachineRepository(prisma);
 		this.planRepository = new PlanRepository(prisma);
+		this.bulkRepository = new BulkRepository(prisma);
+		this.memberRepository = new MemberRepository(prisma);
 	}
 
 	async createGym(
@@ -266,6 +273,47 @@ export class GymService {
 				await this.handleSubscriptionPending(payload.subscription.entity);
 				break;
 		}
+	};
+	syncAttendance = async (syncData: SyncData, gymId: string): Promise<BaseResponse<number>> => {
+		const logs = await this.machineRepository.getDeviceLogs(
+			syncData.serialNumber,
+			env.MACHINE_SERVER_API_KEY,
+			syncData.date,
+		);
+		const members = await this.memberRepository.getMembers(
+			logs.map((log) => log.memberCode),
+			gymId,
+		);
+		const memberMap = new Map(members.map((member) => [member.membershipCode, member.id]));
+
+		const data: createManyAttendanceType = logs
+			.map((log) => {
+				const memberId = memberMap.get(log.memberCode);
+				if (!memberId) {
+					return null;
+				}
+				return {
+					memberId: memberId,
+					membershipCode: log.memberCode,
+					timestamp: log.logDate,
+					gymId: gymId,
+					type: "IN" as CheckInType,
+				};
+			})
+			.filter((item): item is NonNullable<typeof item> => item !== null);
+		if (data.length < 1) {
+			return {
+				message: "failed",
+				success: false,
+				data: 0,
+			};
+		}
+		await this.bulkRepository.syncAttenceWithLogs(data);
+		return {
+			message: "successfully synced",
+			success: true,
+			data: data.length,
+		};
 	};
 
 	private handleSubscriptionActivated = async (subscription: any): Promise<void> => {

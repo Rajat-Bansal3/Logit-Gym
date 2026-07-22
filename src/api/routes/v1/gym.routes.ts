@@ -44,5 +44,6 @@ router.post(
 	roleMiddleware("OWNER"),
 	catchAsync(gymController.getPresignedUrls),
 );
+router.post("sync-attendances", roleMiddleware("OWNER"), catchAsync(gymController.syncAttendance));
 
 export default router;

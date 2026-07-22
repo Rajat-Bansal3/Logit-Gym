@@ -3,6 +3,11 @@ import { env } from "../../env";
 import type { PrismaClient } from "../../generated/client";
 import { MachineError, MachineErrorCode } from "../../shared/errors/machine-errors";
 
+export type LogType = {
+	memberCode: number;
+	logDate: string;
+};
+
 export class MachineRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 	async addMachine({
@@ -31,7 +36,7 @@ export class MachineRepository {
 		}
 
 		try {
-			const res = await axios.post(`${env.MACHINE_SERVER}/AddBiometric`, null, {
+			const result = await axios.post(`${env.MACHINE_SERVER}/AddBiometric`, null, {
 				params: {
 					APIKey: apiKey,
 					DeviceName: machineId,
@@ -39,7 +44,7 @@ export class MachineRepository {
 				},
 				timeout: 5000,
 			});
-			return res.data;
+			return result.data;
 		} catch (error) {
 			await this.prisma.machines.delete({ where: { serialNumber } });
 
@@ -80,13 +85,6 @@ export class MachineRepository {
 				},
 				timeout: 5000,
 			});
-			//    const res = await axios.post(
-			//     `${env.MACHINE_SERVER}/DeleteBiometric?APIKey=${apiKey}&SerialNumber=${serialNumber}`,
-			//     null,
-			//     {
-			//       timeout: 5000,
-			//     },
-			//   );
 			return res.data;
 		} catch (error) {
 			console.log(error);
@@ -110,10 +108,6 @@ export class MachineRepository {
 		serialNumbers,
 		memberName,
 		biometricCode,
-		IsBioPasswordUpload,
-		IsCardUpload,
-		IsFaceUpload,
-		IsFPUpload,
 	}: {
 		apiKey: string;
 		serialNumbers: string[];
@@ -130,19 +124,13 @@ export class MachineRepository {
 				params: {
 					APIKey: apiKey,
 					EmployeeName: memberName,
-					EmployeeCode: biometricCode.toString(),
-					CardNumber: cardNumber,
-					SerialNumbers: serialNumbers.join(","),
-					VerifyMode: "face+card",
-					IsFaceUpload,
-					IsFPUpload,
-					IsCardUpload,
-					IsBioPasswordUpload,
+					EmployeeCode: String(biometricCode),
+					CardNumber: cardNumber || "",
+					SerialNumbers: Array.isArray(serialNumbers) ? serialNumbers.join(",") : serialNumbers,
+					IsFPUpload: true,
 				},
 				timeout: 5000,
-				headers: {
-					"Content-Type": "application/json",
-				},
+				headers: { "Content-Type": "application/json" },
 			});
 
 			return res.statusText;
@@ -171,8 +159,8 @@ export class MachineRepository {
 		const res = await axios.post(`${env.MACHINE_SERVER}/DeleteUser`, null, {
 			params: {
 				APIKey: apiKey,
-				EmployeeCode: biometricCode.toString(),
-				SerialNumber: serialNumbers.join(","),
+				EmployeeCode: String(biometricCode),
+				SerialNumbers: Array.isArray(serialNumbers) ? serialNumbers.join(",") : serialNumbers,
 			},
 			timeout: 5000,
 		});
@@ -213,16 +201,57 @@ export class MachineRepository {
 		biometricCode: number;
 		expirationDate: Date;
 	}): Promise<string> {
-		const res = await axios.get(`${env.MACHINE_SERVER}/SetUserExpiration`, {
+		const formattedDate = new Date(expirationDate).toISOString().split("T")[0];
+
+		const results = await Promise.allSettled(
+			serialNumbers.map((sn) =>
+				axios
+					.get(`${env.MACHINE_SERVER}/SetUserExpiration`, {
+						params: {
+							APIKey: apiKey,
+							SerialNumber: sn,
+							EmployeeCode: String(biometricCode),
+							ExpirationDate: formattedDate,
+						},
+						timeout: 5000,
+					})
+					.then((r) => r.statusText),
+			),
+		);
+		const { allOk, summary } = this.summarizeSettled(serialNumbers, results);
+		console.log(allOk);
+		console.log(summary);
+		return allOk;
+	}
+	async getDeviceLogs(serialNumbers: string[], apiKey: string, date: string): Promise<LogType[]> {
+		const results = await axios.get(`${env.MACHINE_SERVER}/GetDeviceLogs`, {
 			params: {
 				APIKey: apiKey,
-				SerialNumber: serialNumbers.join(","),
-				EmployeeCode: biometricCode.toString(),
-				ExpirationDate: expirationDate.toISOString().split("T")[0],
+				SerialNumber: serialNumbers,
+				FromDate: date,
+				ToDate: date,
 			},
 			timeout: 5000,
 		});
+		return results.data.map((log: any) => ({
+			memberCode: Number(log.EmployeeCode),
+			logDate: log.LogDate,
+		}));
+	}
 
-		return res.statusText;
+	private summarizeSettled(serialNumbers: string[], results: any) {
+		const summary = results.map((r: any, i: number) => ({
+			serialNumber: serialNumbers[i],
+			ok: r.status === "fulfilled",
+			result: r.status === "fulfilled" ? r.value : undefined,
+			error:
+				r.status === "rejected"
+					? r.reason.response
+						? { status: r.reason.response.status, data: r.reason.response.data }
+						: { message: r.reason.message }
+					: undefined,
+		}));
+		const allOk = summary.every((s: any) => s.ok);
+		return { allOk, summary };
 	}
 }
