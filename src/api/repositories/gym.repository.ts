@@ -12,6 +12,11 @@ export type gym_with_profile = Prisma.GymGetPayload<{
 	include: {
 		gymProfile: true;
 		machines: true;
+		_count: {
+			select: {
+				members: true;
+			};
+		};
 	};
 }>;
 
@@ -100,6 +105,15 @@ export class GymRepository {
 			include: {
 				gymProfile: true,
 				machines: true,
+				_count: {
+					select: {
+						members: {
+							where: {
+								isDeleted: false,
+							},
+						},
+					},
+				},
 			},
 		});
 	};

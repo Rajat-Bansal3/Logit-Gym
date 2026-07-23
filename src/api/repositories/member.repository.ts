@@ -222,105 +222,108 @@ export class MemberRepository {
 	async create(gymId: string, lastCode: number, input: OnboardMember): Promise<MemberWithDetails> {
 		const endDate = computeMembershipEndDate(input.membershipStartDate, input.planType);
 
-		return this.prisma.$transaction(async (tx) => {
-			const rand = crypto.randomUUID().split("-")[0];
-			const username = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
-			const password = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
+		return this.prisma.$transaction(
+			async (tx) => {
+				const rand = crypto.randomUUID().split("-")[0];
+				const username = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
+				const password = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
 
-			const member = await tx.member.create({
-				data: {
-					gymId,
-					name: input.name,
-					username: username,
-					dateOfBirth: input.dateOfBirth,
-					address: input.address,
-					membershipCode: lastCode,
-					phone: input.phone,
-					gender: input.gender,
-					age: computeAge(input.dateOfBirth),
-					...(input.email !== undefined && { email: input.email }),
-					...(input.emergencyContact !== undefined && {
-						emergencyContact: input.emergencyContact,
-					}),
-					...(input.weight !== undefined && { weight: input.weight }),
-					...(input.height !== undefined && { height: input.height }),
-					...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
-				},
-			});
-			await tx.user.create({
-				data: {
-					...(input.email && { email: input.email }),
-					username: username,
-					password: await this.authService.hashPassword(password),
-					role: "MEMBER",
-
-					member: {
-						connect: { username: username },
-					},
-				},
-			});
-			if (input.isMachine && input.serialNumbers && input.serialNumbers?.length > 0) {
-				const machines = await tx.machines.findMany({
-					where: {
-						serialNumber: { in: input.serialNumbers },
-						gymId,
-					},
-					select: { id: true },
-				});
-
-				await tx.memberMachine.createMany({
-					data: machines.map((machine) => ({
-						memberId: member.id,
-						machineId: machine.id,
-					})),
-				});
-			}
-			const membership = await tx.membership.create({
-				data: {
-					memberId: member.id,
-					planType: input.planType,
-					startDate: input.membershipStartDate,
-					endDate,
-					dueAmount: input.dueAmount,
-					isActive: true,
-					...(input.planName !== undefined && { planName: input.planName }),
-					membershipAmount: input.membershipAmount,
-				},
-			});
-			if (input.dueAmount === 0) {
-				await tx.payment.create({
+				const member = await tx.member.create({
 					data: {
-						amount: input.membershipAmount,
 						gymId,
-						memberId: member.id,
-						membershipId: membership.id,
-						category: "Membership",
-						paidDate: new Date(),
+						name: input.name,
+						username: username,
+						dateOfBirth: input.dateOfBirth,
+						address: input.address,
+						membershipCode: lastCode,
+						phone: input.phone,
+						gender: input.gender,
+						age: computeAge(input.dateOfBirth),
+						...(input.email !== undefined && { email: input.email }),
+						...(input.emergencyContact !== undefined && {
+							emergencyContact: input.emergencyContact,
+						}),
+						...(input.weight !== undefined && { weight: input.weight }),
+						...(input.height !== undefined && { height: input.height }),
+						...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
 					},
 				});
-				await tx.gymMetrics.update({
-					where: {
-						gymId,
-					},
+				await tx.user.create({
 					data: {
-						totalRevenue: {
-							increment: input.membershipAmount,
+						...(input.email && { email: input.email }),
+						username: username,
+						password: await this.authService.hashPassword(password),
+						role: "MEMBER",
+
+						member: {
+							connect: { username: username },
 						},
 					},
 				});
-			}
+				if (input.isMachine && input.serialNumbers && input.serialNumbers?.length > 0) {
+					const machines = await tx.machines.findMany({
+						where: {
+							serialNumber: { in: input.serialNumbers },
+							gymId,
+						},
+						select: { id: true },
+					});
 
-			const updated = await tx.member.update({
-				where: { id: member.id },
-				data: { currentMembershipId: membership.id },
-				include: memberWithDetails,
-			});
+					await tx.memberMachine.createMany({
+						data: machines.map((machine) => ({
+							memberId: member.id,
+							machineId: machine.id,
+						})),
+					});
+				}
+				const membership = await tx.membership.create({
+					data: {
+						memberId: member.id,
+						planType: input.planType,
+						startDate: input.membershipStartDate,
+						endDate,
+						dueAmount: input.dueAmount,
+						isActive: true,
+						...(input.planName !== undefined && { planName: input.planName }),
+						membershipAmount: input.membershipAmount,
+					},
+				});
+				if (input.dueAmount === 0) {
+					await tx.payment.create({
+						data: {
+							amount: input.membershipAmount,
+							gymId,
+							memberId: member.id,
+							membershipId: membership.id,
+							category: "Membership",
+							paidDate: new Date(),
+						},
+					});
+					await tx.gymMetrics.update({
+						where: {
+							gymId,
+						},
+						data: {
+							totalRevenue: {
+								increment: input.membershipAmount,
+							},
+						},
+					});
+				}
 
-			await tx.memberMetrics.create({
-				data: { memberId: member.id },
-			});
-			return updated;
-		});
+				const updated = await tx.member.update({
+					where: { id: member.id },
+					data: { currentMembershipId: membership.id },
+					include: memberWithDetails,
+				});
+
+				await tx.memberMetrics.create({
+					data: { memberId: member.id },
+				});
+				return updated;
+			},
+			{ timeout: 10000, maxWait: 10000 },
+		);
 	}
 
 	async update(memberId: string, input: UpdateMember): Promise<MemberWithDetails> {

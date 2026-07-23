@@ -3,7 +3,7 @@ import type { CheckInType, PrismaClient } from "../../generated/client";
 export type createManyAttendanceType = {
 	memberId: string;
 	membershipCode: number;
-	timestamp: string;
+	timestamp: Date;
 	gymId: string;
 	type: CheckInType;
 }[];

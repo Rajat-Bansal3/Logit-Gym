@@ -295,7 +295,7 @@ export class GymService {
 				return {
 					memberId: memberId,
 					membershipCode: log.memberCode,
-					timestamp: log.logDate,
+					timestamp: this.utcDate(log.logDate),
 					gymId: gymId,
 					type: "IN" as CheckInType,
 				};
@@ -315,6 +315,9 @@ export class GymService {
 			data: data.length,
 		};
 	};
+	private utcDate(deviceTime: string) {
+		return new Date(new Date(`${deviceTime.replace(" ", "T")}+05:30`).toISOString());
+	}
 
 	private handleSubscriptionActivated = async (subscription: any): Promise<void> => {
 		const gymId = subscription.notes.gymId;

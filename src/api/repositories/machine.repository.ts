@@ -127,9 +127,9 @@ export class MachineRepository {
 					EmployeeCode: String(biometricCode),
 					CardNumber: cardNumber || "",
 					SerialNumbers: Array.isArray(serialNumbers) ? serialNumbers.join(",") : serialNumbers,
-					IsFPUpload: true,
+					IsFPUpload: false,
 				},
-				timeout: 5000,
+				timeout: 10000,
 				headers: { "Content-Type": "application/json" },
 			});
 
