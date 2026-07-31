@@ -1,9 +1,18 @@
 import { Router } from "express";
+import multer from "multer";
 import { catchAsync } from "../../../shared/utils/util_functions";
 import { GymController } from "../../controller/gym.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { roleMiddleware } from "../../middleware/role.middleware";
 import memberRouter from "../v1/member.routes";
+
+const upload = multer({
+	storage: multer.memoryStorage(),
+	limits: {
+		fileSize: 5 * 1024 * 1024,
+		files: 1,
+	},
+});
 
 const router = Router();
 const gymController = new GymController();
@@ -45,5 +54,11 @@ router.post(
 	catchAsync(gymController.getPresignedUrls),
 );
 router.post("/sync-attendances", roleMiddleware("OWNER"), catchAsync(gymController.syncAttendance));
+router.post(
+	"/bulk-add-members",
+	roleMiddleware("OWNER"),
+	upload.single("file"),
+	catchAsync(gymController.bulkAddMembers),
+);
 
 export default router;

@@ -248,6 +248,16 @@ export class MachineRepository {
 			},
 		});
 	}
+	async getMachineUsers(serialNumber: string, apiKey: string) {
+		const results = await axios.get(`${env.MACHINE_SERVER}/FetchLiveUsersFromBiometric`, {
+			params: {
+				APIKey: apiKey,
+				SerialNumber: serialNumber,
+			},
+			timeout: 500000,
+		});
+		return results.data;
+	}
 
 	private summarizeSettled(serialNumbers: string[], results: any) {
 		const summary = results.map((r: any, i: number) => ({

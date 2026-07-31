@@ -1,7 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
+import * as xlsx from "xlsx";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import {
 	addMachineSchema,
+	bulkAddSchema,
+	bulkMembersSchema,
 	createGymSchema,
 	createSubscriptionSchema,
 	getPresignedUrlsSchema,
@@ -12,13 +15,18 @@ import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { createRZPPlan } from "../../shared/utils/rzp";
 import { GymService } from "../services/gym.service";
+import { MemberService } from "../services/member.services";
 
 export class GymController {
 	private gymService: GymService;
+	private memberService: MemberService;
 	private logger: AppLogger;
 
 	constructor() {
 		this.gymService = new GymService({ prisma: client });
+		this.memberService = new MemberService({
+			prisma: client,
+		});
 		this.logger = new AppLogger();
 	}
 
@@ -210,6 +218,68 @@ export class GymController {
 			res.status(200).json(ok);
 		} catch (error) {
 			next(error);
+		}
+	};
+	bulkAddMembers = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const data = bulkAddSchema.parse(req.body);
+			const user = req.user;
+			console.log(user);
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "gym id not found");
+			}
+			switch (data.method) {
+				case "excel": {
+					if (!req.file) {
+						throw new GymError(GymErrorCode.NOT_FOUND, "No file provided");
+					}
+					const workbook = xlsx.read(req.file.buffer, {
+						type: "buffer",
+						cellDates: true,
+					});
+					const sheet = workbook.SheetNames[0];
+					if (!sheet) {
+						throw new GymError(GymErrorCode.NOT_FOUND, "no sheets found in uploaded file");
+					}
+
+					const worksheet = workbook.Sheets[sheet];
+
+					if (!worksheet) {
+						throw new GymError(GymErrorCode.NOT_FOUND, "worksheet not found");
+					}
+
+					const members = xlsx.utils.sheet_to_json(worksheet);
+					const payload = bulkMembersSchema.parse(members);
+					const report_excel_bulkOnboard = await this.memberService.bulkOnboardExcelMembers(
+						user.gymId,
+						payload,
+						user,
+					);
+					return res.status(200).json(report_excel_bulkOnboard);
+				}
+
+				case "machineSync": {
+					if (!data.serialNumber) {
+						throw new GymError(
+							GymErrorCode.BAD_REQUEST,
+							"serial number is required with this type",
+						);
+					}
+					const report_machine_bulkOnboard = await this.memberService.bulkOnboardMachineMembers(
+						user.gymId,
+						data.serialNumber,
+						user,
+					);
+					return res.status(200).json(report_machine_bulkOnboard);
+				}
+				default:
+					break;
+			}
+
+			return res.status(200).json({});
+		} catch (error) {
+			next(error);
+			return;
 		}
 	};
 }

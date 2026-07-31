@@ -127,8 +127,34 @@ export class MemberRepository {
 		this.authService = new AuthService();
 	}
 
-	async findByPhone(phone: string): Promise<Member | null> {
-		return this.prisma.member.findUnique({ where: { phone } });
+	async findByPhone(phone: string, gymId: string): Promise<Member | null> {
+		return this.prisma.member.findUnique({
+			where: {
+				gymId_phone: {
+					gymId,
+					phone,
+				},
+			},
+		});
+	}
+	async findManyByPhones(phones: string[], gymId: string): Promise<{ phone: string | null }[]> {
+		return this.prisma.member.findMany({
+			where: {
+				gymId,
+				phone: { in: phones },
+			},
+			select: { phone: true },
+		});
+	}
+
+	async findManyByEmails(emails: string[], gymId: string): Promise<{ email: string | null }[]> {
+		return this.prisma.member.findMany({
+			where: {
+				gymId,
+				email: { in: emails },
+			},
+			select: { email: true },
+		});
 	}
 
 	async findByPhoneAndGym(phone: string, gymId: string): Promise<Member | null> {
@@ -220,14 +246,18 @@ export class MemberRepository {
 		return { members, total, page, limit };
 	}
 
-	async create(gymId: string, lastCode: number, input: OnboardMember): Promise<MemberWithDetails> {
+	async create(
+		gymId: string,
+		lastCode: number,
+		input: OnboardMember,
+		gym_username: string,
+	): Promise<MemberWithDetails> {
 		const endDate = computeMembershipEndDate(input.membershipStartDate, input.planType);
 
 		return this.prisma.$transaction(
 			async (tx) => {
-				const rand = crypto.randomUUID().split("-")[0];
-				const username = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
-				const password = `${input.name}${rand}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
+				const username = `${gym_username}_${lastCode}`.trim().toLowerCase().replace(" ", "_");
+				const password = `${lastCode}`.trim();
 
 				const member = await tx.member.create({
 					data: {
@@ -235,7 +265,7 @@ export class MemberRepository {
 						name: input.name,
 						username: username,
 						dateOfBirth: input.dateOfBirth,
-						address: input.address,
+						...(input.address && { address: input.address }),
 						membershipCode: lastCode,
 						phone: input.phone,
 						gender: input.gender,

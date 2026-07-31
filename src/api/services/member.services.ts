@@ -3,18 +3,21 @@ import type { CheckInType, Gym, Payment, Prisma, PrismaClient } from "../../gene
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
-import type {
-	ListMembersQuery,
-	MarkAttendance,
-	MemberToMachine,
-	OnboardMember,
-	ReportQuery,
-	UpdateMember,
+import type { bulkAddMembers, ValidMember } from "../../shared/types/gym.types";
+import {
+	type ListMembersQuery,
+	type MarkAttendance,
+	type MemberToMachine,
+	machineFetchedMembers,
+	type OnboardMember,
+	type ReportQuery,
+	type UpdateMember,
 } from "../../shared/types/member.types";
 import type { CreateMemberMembershipInput } from "../../shared/types/payment.types";
 import type { BaseResponse } from "../../shared/types/returns";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
+import { BulkRepository } from "../repositories/bulk.repository";
 import { GymRepository } from "../repositories/gym.repository";
 import { MachineRepository } from "../repositories/machine.repository";
 import {
@@ -33,11 +36,13 @@ export class MemberService {
 	private readonly memberRepository: MemberRepository;
 	private readonly gymRepository: GymRepository;
 	private readonly machineRepository: MachineRepository;
+	private readonly bulkRepository: BulkRepository;
 	private readonly logger: AppLogger;
 
 	constructor({ prisma = client }: { prisma: PrismaClient }) {
 		this.memberRepository = new MemberRepository(prisma);
 		this.gymRepository = new GymRepository(prisma);
+		this.bulkRepository = new BulkRepository(prisma);
 		this.logger = new AppLogger();
 		this.machineRepository = new MachineRepository(prisma);
 	}
@@ -52,7 +57,7 @@ export class MemberService {
 		if (!gym) {
 			throw new GymError(GymErrorCode.NOT_FOUND, "gym not found");
 		}
-		const existingPhone = await this.memberRepository.findByPhone(data.phone);
+		const existingPhone = await this.memberRepository.findByPhone(data.phone, gym.id);
 		if (existingPhone) {
 			throw new MemberError(
 				MemberErrorCode.CONFLICT,
@@ -68,7 +73,12 @@ export class MemberService {
 			throw new MemberError(MemberErrorCode.BAD_REQUEST, "membership code not provided");
 		}
 		await this.gymRepository.update(gymId, {}, gym.settings?.biometricPreference === "AUTO");
-		const member = await this.memberRepository.create(gymId, membershipCode, data);
+		const member = await this.memberRepository.create(
+			gymId,
+			membershipCode,
+			data,
+			gym.owner.username,
+		);
 
 		if (data.isMachine && data.serialNumbers) {
 			await this.machineRepository.addUser({
@@ -179,7 +189,7 @@ export class MemberService {
 		}
 
 		if (data.phone !== undefined && data.phone !== member.phone) {
-			const existingPhone = await this.memberRepository.findByPhone(data.phone);
+			const existingPhone = await this.memberRepository.findByPhone(data.phone, gymId);
 			if (existingPhone) {
 				throw new MemberError(
 					MemberErrorCode.CONFLICT,
@@ -464,6 +474,140 @@ export class MemberService {
 		return {
 			message: "memberships create successfully",
 			success: true,
+		};
+	}
+	async bulkOnboardExcelMembers(
+		gymId: string,
+		members: bulkAddMembers,
+		_user: AuthenticatedUser,
+	): Promise<
+		BaseResponse<{
+			count: number;
+			failed: { row: number; reason: string }[];
+		}>
+	> {
+		this.logger.debug("bulkOnboardMembers: starting", {
+			gymId,
+			count: members.length,
+		});
+
+		const gym = await this.gymRepository.findById({ gymId, isDeleted: false });
+		if (!gym) {
+			throw new GymError(GymErrorCode.NOT_FOUND, "gym not found");
+		}
+
+		const phones: string[] = members.map((r) => r.PhoneNumber.toString());
+		const emails: string[] = members
+			.filter((r): r is typeof r & { Email: string } => !!r.Email)
+			.map((r) => r.Email);
+
+		const [existingPhones, existingEmails] = await Promise.all([
+			this.memberRepository.findManyByPhones(phones, gym.id),
+			this.memberRepository.findManyByEmails(emails, gym.id),
+		]);
+
+		const existingPhoneSet = new Set<string>(
+			existingPhones.map((m) => m.phone).filter((e): e is string => e !== null),
+		);
+		const existingEmailSet = new Set<string>(
+			existingEmails.map((m) => m.email).filter((e): e is string => e !== null),
+		);
+
+		const failed: { row: number; reason: string }[] = [];
+		const valid: ValidMember[] = [];
+
+		for (let i = 0; i < members.length; i++) {
+			const row = members[i];
+			if (!row) {
+				continue;
+			}
+
+			if (existingPhoneSet.has(row.PhoneNumber.toString())) {
+				failed.push({
+					row: i + 1,
+					reason: `Phone ${row.PhoneNumber} already exists`,
+				});
+				continue;
+			}
+
+			if (row.Email && existingEmailSet.has(row.Email)) {
+				failed.push({
+					row: i + 1,
+					reason: `Email ${row.Email} already exists`,
+				});
+				continue;
+			}
+
+			let membershipCode: number | undefined = row.EmployeeCode;
+
+			if (
+				gym.settings &&
+				gym.startingMembershipCode !== null &&
+				gym.settings.biometricPreference === "AUTO"
+			) {
+				membershipCode = gym.startingMembershipCode + gym.biometricCounter + valid.length;
+			}
+
+			if (membershipCode === undefined || membershipCode === null) {
+				failed.push({ row: i + 1, reason: "No membership code available" });
+				continue;
+			}
+
+			valid.push({
+				membershipCode,
+				data: {
+					name: row.EmployeeName,
+					gender: row.Gender,
+					phone: row.PhoneNumber.toString(),
+					emergencyContact: row.EmergencyContact?.toString(),
+					email: row.Email,
+					dateOfBirth: row.DOB,
+					weight: row.Weight,
+					height: row.Height,
+					planType: row.MembershipPlan,
+					membershipAmount: row.MembershipAmount,
+					membershipStartDate: row.StartDate,
+					dueAmount: 0,
+					isMachine: false,
+				},
+			});
+		}
+
+		await this.bulkRepository.BulkUploadMembersExcel(gymId, valid, gym.owner.username);
+
+		if (gym.settings?.biometricPreference === "AUTO" && valid.length > 0) {
+			await this.gymRepository.update(gymId, { biometricCounter: valid.length }, false);
+		}
+
+		return {
+			message: "Bulk upload completed",
+			success: true,
+			data: { count: valid.length, failed },
+		};
+	}
+	async bulkOnboardMachineMembers(
+		gymId: string,
+		serialNumber: string,
+		user: AuthenticatedUser,
+	): Promise<BaseResponse<null>> {
+		if (user.gymId !== gymId) {
+			throw new GymError(GymErrorCode.FORBIDDEN, "not your gym");
+		}
+		const payload = await this.machineRepository.getMachineUsers(
+			serialNumber,
+			env.MACHINE_SERVER_API_KEY,
+		);
+
+		const membershipCodes = payload.map((member: { EmployeeCode: any }) =>
+			Number(member.EmployeeCode),
+		);
+
+		const members = machineFetchedMembers.parse(membershipCodes);
+		await this.bulkRepository.BulkUploadMembersMachine(gymId, members, serialNumber);
+		return {
+			message: "successfully added members",
+			success: true,
+			data: null,
 		};
 	}
 }

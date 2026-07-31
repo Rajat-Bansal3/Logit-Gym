@@ -145,6 +145,7 @@ export class GymRepository {
 	}): Promise<Prisma.GymGetPayload<{
 		include: {
 			settings: true;
+			owner: true;
 		};
 	}> | null> => {
 		return await this.client.gym.findUnique({
@@ -154,6 +155,7 @@ export class GymRepository {
 			},
 			include: {
 				settings: true,
+				owner: true,
 			},
 		});
 	};
@@ -162,6 +164,7 @@ export class GymRepository {
 		data: {
 			name?: string;
 			address?: string;
+			biometricCounter?: number;
 		},
 		autoIncr: boolean = false,
 	): Promise<void> => {
@@ -173,6 +176,9 @@ export class GymRepository {
 				...(data.name && { name: data.name }),
 				...(data.address && { address: data.address }),
 				...(autoIncr && { biometricCounter: { increment: 1 } }),
+				...(data.biometricCounter && {
+					biometricCounter: { increment: data.biometricCounter },
+				}),
 			},
 		});
 	};

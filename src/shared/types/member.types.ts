@@ -13,12 +13,12 @@ export const days = [
 export const onboardMemberSchema = z.object({
 	name: z.string().min(1),
 	dateOfBirth: z.coerce.date(),
-	address: z.string().min(1),
+	address: z.string().min(1).optional(),
 	phone: z.string().min(1),
 	email: z.string().optional(),
 	gender: z.string().min(1),
 	emergencyContact: z.string().optional(),
-	avatarUrl: z.string().url().optional(),
+	avatarUrl: z.string().optional(),
 
 	membershipCode: z.coerce.number().optional(),
 
@@ -92,7 +92,11 @@ export const reportQuerySchema = z.object({
 	from: z.coerce.date().optional(),
 	to: z.coerce.date().optional(),
 });
+export const machineFetchedMembers = z.array(z.number());
 
+// "EmployeeCode": "01",
+// "FPCount": "1",
+// "Privilege": "USER"
 export type OnboardMember = z.infer<typeof onboardMemberSchema>;
 export type MemberToMachine = z.infer<typeof memberToMachineSchema>;
 export type UpdateMember = z.infer<typeof updateMemberSchema>;

@@ -1,5 +1,6 @@
 import z from "zod";
-import { BioPref } from "../../generated/enums";
+import { BioPref, MembershipPlanType } from "../../generated/enums";
+import type { OnboardMember } from "./member.types";
 export const createGymSchema = z.object({
 	name: z.string().min(1),
 	address: z.string().min(1),
@@ -61,8 +62,39 @@ export const syncDataSchema = z.object({
 	date: z.string(),
 	serialNumber: z.array(z.string()),
 });
+export const bulkAddSchema = z.object({
+	method: z.enum(["machineSync", "excel"]),
+	serialNumber: z.string().optional(),
+});
+export const bulkMembersSchema = z.array(
+	z.object({
+		EmployeeCode: z.number(),
+		EmployeeName: z.string(),
+		Gender: z.string(),
+		PhoneNumber: z.number(),
+		EmergencyContact: z.number(),
+		Email: z.email(),
+
+		DOB: z.coerce.date(),
+
+		Weight: z.number(),
+		Height: z.number(),
+
+		MembershipPlan: z.string().trim().pipe(z.enum(MembershipPlanType)),
+
+		MembershipAmount: z.number(),
+
+		StartDate: z.coerce.date(),
+	}),
+);
+export type ValidMember = {
+	membershipCode: number;
+	data: OnboardMember;
+};
 export type UpdateGym = z.infer<typeof updateGymSchema>;
 export type CreateGym = z.infer<typeof createGymSchema>;
 export type AddMachine = z.infer<typeof addMachineSchema>;
 export type CreateSubscription = z.infer<typeof createSubscriptionSchema>;
 export type SyncData = z.infer<typeof syncDataSchema>;
+export type bulkAdd = z.infer<typeof bulkAddSchema>;
+export type bulkAddMembers = z.infer<typeof bulkMembersSchema>;

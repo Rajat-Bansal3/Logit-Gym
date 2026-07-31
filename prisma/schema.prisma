@@ -156,8 +156,8 @@ model Member {
   username    String    @unique
   dateOfBirth DateTime?
   address     String?
-  phone       String?   @unique
-  email       String?   @unique
+  phone       String?
+  email       String?
   avatarUrl   String?
   gender      String?
 
@@ -187,6 +187,8 @@ model Member {
   memberMachines   MemberMachine[]
 
   @@unique([gymId, membershipCode])
+  @@unique([gymId, phone])
+  @@unique([gymId, email])
   @@index([gymId])
   @@index([status])
   @@index([joinDate])
