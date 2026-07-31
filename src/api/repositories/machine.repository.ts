@@ -238,6 +238,16 @@ export class MachineRepository {
 			logDate: log.LogDate,
 		}));
 	}
+	async getMachines(gymId: string, serialNumbers: string[]) {
+		return await this.prisma.machines.findMany({
+			where: {
+				gymId: gymId,
+				serialNumber: {
+					in: serialNumbers,
+				},
+			},
+		});
+	}
 
 	private summarizeSettled(serialNumbers: string[], results: any) {
 		const summary = results.map((r: any, i: number) => ({

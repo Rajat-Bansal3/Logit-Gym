@@ -11,6 +11,7 @@ router.use(authMiddleware);
 
 // POST /gyms/:gymId/members — onboard a new member (owner only)
 router.post("/", roleMiddleware("OWNER"), controller.onboardMember);
+router.post("/push-member-to-machine", roleMiddleware("OWNER"), controller.pushMemberToMachine);
 
 // GET /gyms/:gymId/members — list all members
 router.get("/", roleMiddleware("OWNER"), controller.listMembers);

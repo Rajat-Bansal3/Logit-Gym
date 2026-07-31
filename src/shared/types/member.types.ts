@@ -38,6 +38,12 @@ export const onboardMemberSchema = z.object({
 	IsFaceUpload: z.boolean().optional(),
 	IsFPUpload: z.boolean().optional(),
 });
+export const memberToMachineSchema = z.object({
+	memberId: z.string(),
+	membershipCode: z.number(),
+	name: z.string(),
+	serialNumbers: z.array(z.string()),
+});
 
 const daysEnum = z.enum([
 	"sunday",
@@ -74,7 +80,7 @@ export const listMembersQuerySchema = z.object({
 	search: z.string().optional(),
 	page: z.coerce.number().min(1).default(1),
 	limit: z.coerce.number().min(1).max(100).default(20),
-	category: z.enum(["active", "expiring", "deleted", "expired"]),
+	category: z.enum(["active", "expiring", "deleted", "expired", "no-machine"]),
 });
 
 export const markAttendanceSchema = z.object({
@@ -88,6 +94,7 @@ export const reportQuerySchema = z.object({
 });
 
 export type OnboardMember = z.infer<typeof onboardMemberSchema>;
+export type MemberToMachine = z.infer<typeof memberToMachineSchema>;
 export type UpdateMember = z.infer<typeof updateMemberSchema>;
 export type ListMembersQuery = z.infer<typeof listMembersQuerySchema>;
 export type MarkAttendance = z.infer<typeof markAttendanceSchema>;

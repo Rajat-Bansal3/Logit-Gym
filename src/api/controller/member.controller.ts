@@ -6,6 +6,7 @@ import {
 	deleteMemberSchema,
 	listMembersQuerySchema,
 	markAttendanceSchema,
+	memberToMachineSchema,
 	onboardMemberSchema,
 	reportQuerySchema,
 	updateMemberSchema,
@@ -41,6 +42,24 @@ export class MemberController {
 			const result = await this.memberService.onboardMember(gymId, data, user);
 
 			this.logger.debug("onboardMember: completed", { gymId });
+			res.status(201).json(result);
+		} catch (error) {
+			this.logger.error("onboardMember: error", { error });
+			next(error);
+		}
+	};
+	pushMemberToMachine = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			const gymId = req.params.gymId;
+
+			if (!user || !gymId || Array.isArray(gymId)) {
+				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+			}
+
+			const data = memberToMachineSchema.parse(req.body);
+			const result = await this.memberService.pushToMachine(gymId, data, user);
+
 			res.status(201).json(result);
 		} catch (error) {
 			this.logger.error("onboardMember: error", { error });

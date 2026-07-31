@@ -202,6 +202,7 @@ export class MemberRepository {
 			...(membershipFilter && {
 				currentMembership: membershipFilter,
 			}),
+			...(category === "no-machine" && { memberMachines: { none: {} } }),
 			...(category === "deleted" ? { isDeleted: true } : { isDeleted: false }),
 		};
 
@@ -245,7 +246,9 @@ export class MemberRepository {
 						}),
 						...(input.weight !== undefined && { weight: input.weight }),
 						...(input.height !== undefined && { height: input.height }),
-						...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
+						...(input.avatarUrl !== undefined && {
+							avatarUrl: input.avatarUrl,
+						}),
 					},
 				});
 				await tx.user.create({
@@ -892,6 +895,19 @@ export class MemberRepository {
 			},
 		);
 		return curr_membership;
+	}
+	async createMemberMachines(machineId: string[], memberId: string) {
+		return await Promise.all(
+			machineId.map((id) =>
+				this.prisma.memberMachine.create({
+					data: {
+						assignedAt: new Date(),
+						machineId: id,
+						memberId: memberId,
+					},
+				}),
+			),
+		);
 	}
 	private getStreakUpdate(
 		currentStreak: number,

@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from "../../shared/types/auth.types";
 import type {
 	ListMembersQuery,
 	MarkAttendance,
+	MemberToMachine,
 	OnboardMember,
 	ReportQuery,
 	UpdateMember,
@@ -96,6 +97,36 @@ export class MemberService {
 			message: "Member onboarded successfully",
 			success: true,
 			data: { memberId: member.id },
+		};
+	}
+	async pushToMachine(
+		gymId: string,
+		data: MemberToMachine,
+		_user: AuthenticatedUser,
+	): Promise<BaseResponse<null>> {
+		const machines = await this.machineRepository.getMachines(gymId, data.serialNumbers);
+		if (machines.length < data.serialNumbers.length) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "one or more serial number not found");
+		}
+		await this.machineRepository.addUser({
+			apiKey: env.MACHINE_SERVER_API_KEY,
+			biometricCode: data.membershipCode,
+			memberName: data.name,
+			serialNumbers: data.serialNumbers,
+			IsBioPasswordUpload: false,
+			IsCardUpload: false,
+			IsFaceUpload: false,
+			IsFPUpload: false,
+			cardNumber: undefined,
+		});
+		await this.memberRepository.createMemberMachines(
+			machines.map((machine) => machine.id),
+			data.memberId,
+		);
+		return {
+			message: "Member assigned to machines successfully",
+			success: true,
+			data: null,
 		};
 	}
 
