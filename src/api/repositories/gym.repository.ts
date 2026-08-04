@@ -1,5 +1,6 @@
 import type { Gym, Prisma, PrismaClient } from "../../generated/client";
-import type { BioPref } from "../../generated/enums";
+import type { BillingCycle, BioPref } from "../../generated/enums";
+import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import type { CreateGym, UpdateGym } from "../../shared/types/gym.types";
 
 type gym_including_owner = Prisma.GymGetPayload<{
@@ -42,29 +43,56 @@ export class GymRepository {
 		bioPref: BioPref;
 		startingMembershipCode: number | undefined;
 	}): Promise<Gym> => {
-		const settings = await this.client.settings.create({
-			data: {
-				biometricPreference: data.bioPref,
-			},
-		});
-		const gym = await this.client.gym.create({
-			data: {
-				name: data.name,
-				address: data.address,
-				ownerId: data.ownerId,
-				hash: `${data.name}-${crypto.randomUUID()}`,
-				settingsId: settings.id,
-				...(data.startingMembershipCode && {
-					startingMembershipCode: data.startingMembershipCode,
-				}),
-			},
-		});
-		await this.client.gymMetrics.create({
-			data: {
-				gymId: gym.id,
-			},
-		});
+		const gym = this.client.$transaction(async (tx) => {
+			const settings = await tx.settings.create({
+				data: {
+					biometricPreference: data.bioPref,
+				},
+			});
+			const gym = await tx.gym.create({
+				data: {
+					name: data.name,
+					address: data.address,
+					ownerId: data.ownerId,
+					hash: `${data.name}-${crypto.randomUUID()}`,
+					settingsId: settings.id,
+					...(data.startingMembershipCode && {
+						startingMembershipCode: data.startingMembershipCode,
+					}),
+				},
+			});
+			const plan = await tx.plan.findFirst({
+				where: { isActive: true, name: "TRIAL" },
+			});
+			if (!plan) {
+				throw new GymError(GymErrorCode.NOT_FOUND, "no active trail found");
+			}
 
+			const curr = computePeriodEnd(new Date(), plan.billingCycle);
+
+			const sub = await tx.subscription.create({
+				data: {
+					gymId: gym.id,
+					planId: plan.id,
+					status: "TRIALING",
+					currentPeriodStart: new Date(),
+					currentPeriodEnd: curr,
+					trialEndsAt: curr,
+					cancelAtPeriodEnd: false,
+				},
+			});
+
+			await tx.gym.update({
+				where: { id: gym.id },
+				data: { currentSubscriptionId: sub.id },
+			});
+			await tx.gymMetrics.create({
+				data: {
+					gymId: gym.id,
+				},
+			});
+			return gym;
+		});
 		return gym;
 	};
 	createProfile = async (
@@ -234,4 +262,25 @@ export class GymRepository {
 			select: { gymId: true },
 		});
 	};
+}
+function computePeriodEnd(date: Date, cycle: BillingCycle): Date {
+	const end = new Date(date);
+	switch (cycle) {
+		case "TRIAL":
+			end.setDate(end.getDate() + 7);
+			break;
+		case "MONTHLY":
+			end.setMonth(end.getMonth() + 1);
+			break;
+		case "QUARTERLY":
+			end.setMonth(end.getMonth() + 3);
+			break;
+		case "HALF_YEARLY":
+			end.setMonth(end.getMonth() + 6);
+			break;
+		case "YEARLY":
+			end.setFullYear(end.getFullYear() + 1);
+			break;
+	}
+	return end;
 }

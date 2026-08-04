@@ -101,7 +101,7 @@ export class PlanRepository {
 		return this.prisma.subscription.findFirst({
 			where: {
 				gymId,
-				status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] },
+				status: { in: ["ACTIVE", "TRIALING"] },
 			},
 		});
 	};

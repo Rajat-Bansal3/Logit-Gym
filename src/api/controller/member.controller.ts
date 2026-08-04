@@ -354,6 +354,23 @@ export class MemberController {
 			next(error);
 		}
 	};
+	getMemberAttendanceGym = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			this.logger.debug("getMemberAttendance: request received");
+			const user = req.user;
+			const memberId = req.params.memberId;
+			if (!user?.gymId) {
+				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+			}
+			if (!memberId || Array.isArray(memberId)) {
+				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId is required");
+			}
+			const attendances = await this.memberService.getMemberAttendance(memberId);
+			res.status(200).json(attendances);
+		} catch (error) {
+			next(error);
+		}
+	};
 	getMemberGym = async (req: Request, res: Response, next: NextFunction) => {
 		try {
 			this.logger.debug("getMemberGym request recieved");

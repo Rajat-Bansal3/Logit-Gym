@@ -54,12 +54,12 @@ enum MembershipPlanType {
 enum SubscriptionStatus {
   TRIALING
   ACTIVE
-  PAST_DUE
   CANCELLED
   EXPIRED
 }
 
 enum BillingCycle {
+  TRIAL
   MONTHLY
   QUARTERLY
   HALF_YEARLY

@@ -20,6 +20,7 @@ router.get("/attendance", roleMiddleware("OWNER"), controller.getGymAttendance);
 
 // GET /gyms/:gymId/members/:memberId
 router.get("/:memberId", roleMiddleware("OWNER"), controller.getMember);
+router.get("/:memberId/attendance", roleMiddleware("OWNER"), controller.getMemberAttendance);
 
 // PATCH /gyms/:gymId/members/:memberId
 router.patch("/:memberId", roleMiddleware("OWNER"), controller.updateMember);

@@ -350,7 +350,7 @@ export class GymService {
 
 	private handleSubscriptionHalted = async (subscription: any): Promise<void> => {
 		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
-			status: "PAST_DUE",
+			status: "EXPIRED",
 			gracePeriodEnd: new Date(Date.now() + 5 * 86_400_000),
 		});
 	};
@@ -363,7 +363,7 @@ export class GymService {
 
 	private handleSubscriptionPending = async (subscription: any): Promise<void> => {
 		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
-			status: "PAST_DUE",
+			status: "EXPIRED",
 		});
 	};
 

@@ -342,6 +342,9 @@ export class MemberRepository {
 							},
 						},
 					});
+					await tx.memberMetrics.create({
+						data: { memberId: member.id, paymentStatus: "PAID" },
+					});
 				}
 
 				const updated = await tx.member.update({
@@ -350,9 +353,6 @@ export class MemberRepository {
 					include: memberWithDetails,
 				});
 
-				await tx.memberMetrics.create({
-					data: { memberId: member.id },
-				});
 				return updated;
 			},
 			{ timeout: 10000, maxWait: 10000 },
@@ -574,6 +574,7 @@ export class MemberRepository {
 		statusCounts.forEach((row) => {
 			statusMap[row.status] = row._count as number;
 		});
+		console.log(metrics);
 
 		return {
 			totalRevenue: metrics?.totalRevenue ?? 0,
