@@ -110,11 +110,13 @@ export class GymRepository {
 				genderAllowed: profile.genderAllowed,
 				ownerName: profile.ownerName,
 				ownerContact: profile.ownerContact,
-				amenities: profile.amenities,
-				images: profile.images,
+				...(profile.amenities && { amenities: profile.amenities }),
+				...(profile.images && { images: profile.images }),
 
-				fitnessProfession: profile.fitnessProfession,
-				referralOffer: profile.referralOffer,
+				...(profile.fitnessProfession && {
+					fitnessProfession: profile.fitnessProfession,
+				}),
+				...(profile.referralOffer && { referralOffer: profile.referralOffer }),
 			},
 		});
 	};

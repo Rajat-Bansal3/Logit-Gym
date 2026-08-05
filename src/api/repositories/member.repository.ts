@@ -547,7 +547,7 @@ export class MemberRepository {
 			...(to !== undefined && { lte: to }),
 		};
 
-		const [metrics, statusCounts, newMembers] = await this.prisma.$transaction([
+		const [metrics, statusCounts, newMembers] = await Promise.all([
 			this.prisma.gymMetrics.findUnique({
 				where: { gymId },
 			}),
@@ -603,7 +603,7 @@ export class MemberRepository {
 			...(to !== undefined && { lte: to }),
 		};
 
-		const [logs, hourlyRows, weeklyRows] = await this.prisma.$transaction([
+		const [logs, hourlyRows, weeklyRows] = await Promise.all([
 			this.prisma.attendanceLog.findMany({
 				where: {
 					gymId,

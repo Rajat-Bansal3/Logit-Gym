@@ -167,12 +167,12 @@ export class GymController {
 		const plan = await createRZPPlan({
 			amount: 1000,
 			billingCycle: "MONTHLY",
-			name: "basic",
+			name: "TRIAL",
 		});
 		await client.plan.create({
 			data: {
-				billingCycle: "MONTHLY",
-				name: "basic",
+				billingCycle: "TRIAL",
+				name: "TRIAL",
 				price: 1000,
 				razorpayId: plan,
 			},
