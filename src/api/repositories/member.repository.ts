@@ -989,4 +989,22 @@ export class MemberRepository {
 			},
 		});
 	}
+	async getMemberUser(username: string) {
+		return await this.prisma.user.findUnique({
+			where: {
+				username,
+			},
+		});
+	}
+	async changePassword({ username, password }: { username: string; password: string }) {
+		await this.prisma.user.update({
+			where: {
+				username,
+			},
+			data: {
+				password: await this.authService.hashPassword(password),
+			},
+		});
+		return;
+	}
 }

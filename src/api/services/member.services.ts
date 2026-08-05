@@ -2,7 +2,7 @@ import { env } from "../../env";
 import type { CheckInType, Gym, Payment, Prisma, PrismaClient } from "../../generated/client";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
-import type { AuthenticatedUser } from "../../shared/types/auth.types";
+import type { AuthenticatedUser, ChangePasswordMember } from "../../shared/types/auth.types";
 import type { bulkAddMembers, ValidMember } from "../../shared/types/gym.types";
 import {
 	type ListMembersQuery,
@@ -31,12 +31,14 @@ import {
 	MemberRepository,
 	type MemberWithDetails,
 } from "../repositories/member.repository";
+import { AuthService } from "./auth.service";
 
 export class MemberService {
 	private readonly memberRepository: MemberRepository;
 	private readonly gymRepository: GymRepository;
 	private readonly machineRepository: MachineRepository;
 	private readonly bulkRepository: BulkRepository;
+	private readonly authService: AuthService;
 	private readonly logger: AppLogger;
 
 	constructor({ prisma = client }: { prisma: PrismaClient }) {
@@ -44,6 +46,7 @@ export class MemberService {
 		this.gymRepository = new GymRepository(prisma);
 		this.bulkRepository = new BulkRepository(prisma);
 		this.logger = new AppLogger();
+		this.authService = new AuthService();
 		this.machineRepository = new MachineRepository(prisma);
 	}
 
@@ -173,6 +176,23 @@ export class MemberService {
 			success: true,
 			data: result,
 		};
+	}
+	async changePasswordMember(data: ChangePasswordMember) {
+		const memberUser = await this.memberRepository.getMemberUser(data.username);
+		if (!memberUser) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "member with username not found");
+		}
+		if (
+			!(await this.authService.comparePassword(data.oldPassword, memberUser.password)) ||
+			data.newPassword === data.oldPassword
+		) {
+			throw new MemberError(MemberErrorCode.FORBIDDEN, "Invalid credentials");
+		}
+		await this.memberRepository.changePassword({
+			username: data.username,
+			password: data.newPassword,
+		});
+		return;
 	}
 
 	async updateMember(

@@ -85,3 +85,9 @@ export const AuthenticatedUserSchema = z.object({
 	userId: z.string(),
 });
 export type AuthenticatedUser = z.infer<typeof AuthenticatedUserSchema>;
+export const changePasswordSchema = z.object({
+	username: z.string().min(1).max(255),
+	oldPassword: z.string(),
+	newPassword: z.string().min(1).max(255),
+});
+export type ChangePasswordMember = z.infer<typeof changePasswordSchema>;

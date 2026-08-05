@@ -116,7 +116,7 @@ export class AuthService {
 
 		return { authToken, refreshToken };
 	}
-	private async comparePassword(password: string, hash: string): Promise<boolean> {
+	async comparePassword(password: string, hash: string): Promise<boolean> {
 		return bcrypt.compare(password, hash);
 	}
 	async hashPassword(password: string): Promise<string> {
