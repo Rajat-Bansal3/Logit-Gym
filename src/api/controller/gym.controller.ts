@@ -13,7 +13,6 @@ import {
 } from "../../shared/types/gym.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
-import { createRZPPlan } from "../../shared/utils/rzp";
 import { GymService } from "../services/gym.service";
 import { MemberService } from "../services/member.services";
 
@@ -163,18 +162,18 @@ export class GymController {
 			return;
 		}
 	};
-	createPlan = async (_req: Request, res: Response, _next: NextFunction) => {
-		const plan = await createRZPPlan({
-			amount: 1000,
-			billingCycle: "MONTHLY",
-			name: "TRIAL",
-		});
+	createTrailPlan = async (_req: Request, res: Response, _next: NextFunction) => {
+		// const plan = await createRZPPlan({
+		//   amount: 1000,
+		//   billingCycle: "MONTHLY",
+		//   name: "TRIAL",
+		// });
 		await client.plan.create({
 			data: {
 				billingCycle: "TRIAL",
 				name: "TRIAL",
 				price: 1000,
-				razorpayId: plan,
+				razorpayId: "trial_plan",
 			},
 		});
 		res.status(200).json({});
