@@ -16,7 +16,7 @@ const upload = multer({
 
 const router = Router();
 const gymController = new GymController();
-router.get("/create-plan", gymController.createPlan);
+router.get("/create-plan", gymController.createTrailPlan);
 
 router.use(authMiddleware);
 router.use("/:gymId/members", memberRouter);
