@@ -1,10 +1,17 @@
+import fs from "node:fs";
 import path from "node:path";
 import type { NextFunction, Request, Response } from "express";
 import multer, { type FileFilterCallback } from "multer";
 
 const storage = multer.diskStorage({
 	destination: (_req, _file, cb) => {
-		cb(null, "uploads/");
+		const uploadPath = "./uploads";
+
+		if (!fs.existsSync(uploadPath)) {
+			fs.mkdirSync(uploadPath, { recursive: true });
+		}
+
+		cb(null, uploadPath);
 	},
 	filename: (req, file, cb) => {
 		const imageUuid = crypto.randomUUID();

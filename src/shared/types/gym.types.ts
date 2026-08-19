@@ -1,24 +1,50 @@
 import z from "zod";
 import { BioPref, MembershipPlanType } from "../../generated/enums";
 import type { OnboardMember } from "./member.types";
+
+const parseJson = <T extends z.ZodTypeAny>(schema: T) =>
+	z.preprocess((val) => {
+		if (typeof val === "string") {
+			try {
+				return JSON.parse(val);
+			} catch {
+				return val;
+			}
+		}
+		return val;
+	}, schema);
 export const createGymSchema = z.object({
 	name: z.string().min(1),
 	address: z.string().min(1),
 	startingMembershipCode: z.coerce.number().optional(),
-	profile: z.object({
-		timing: z.string(),
-		openDays: z.array(z.string()),
-		instagram: z.string().optional(),
-		genderAllowed: z.string(),
-		ownerName: z.string(),
-		ownerContact: z.string(),
-		fitnessProfession: z.string().optional(),
-		amenities: z.array(z.string()).optional(),
-		referralOffer: z.string().optional(),
-	}),
-	settings: z.object({
-		biometricCodePreference: z.enum(BioPref).default("AUTO"),
-	}),
+	profile: parseJson(
+		z.object({
+			timing: z.string(),
+			openDays: z.preprocess((val) => {
+				if (typeof val === "string") {
+					return [val];
+				}
+				return val;
+			}, z.array(z.string())),
+			instagram: z.string().optional(),
+			genderAllowed: z.string(),
+			ownerName: z.string(),
+			ownerContact: z.string(),
+			fitnessProfession: z.string().optional(),
+			amenities: z.preprocess((val) => {
+				if (typeof val === "string") {
+					return [val];
+				}
+				return val;
+			}, z.array(z.string()).optional()),
+			referralOffer: z.string().optional(),
+		}),
+	),
+	settings: parseJson(
+		z.object({
+			biometricCodePreference: z.enum(BioPref).default("AUTO"),
+		}),
+	),
 });
 
 export const updateGymSchema = z.object({

@@ -6,3 +6,4 @@ logs
 **/generated
 docker_volume
 dist
+uploads

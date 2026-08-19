@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { uploadSingleImage } from "@/shared/utils/image_upload";
+import { uploadSingleImage } from "../../../shared/utils/image_upload";
 import { MemberController } from "../../controller/member.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { roleMiddleware } from "../../middleware/role.middleware";
