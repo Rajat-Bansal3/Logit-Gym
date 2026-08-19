@@ -289,21 +289,22 @@ model Transaction {
 }
 
 model Payment {
-  id           String        @id @default(cuid())
+  id           String          @id @default(cuid())
   memberId     String?
-  member       Member?       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  member       Member?         @relation(fields: [memberId], references: [id], onDelete: Cascade)
   membershipId String?
-  membership   Membership?   @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membership   Membership?     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   gymId        String
-  gym          Gym           @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  gym          Gym             @relation(fields: [gymId], references: [id], onDelete: Cascade)
   amount       Float
   dueDate      DateTime?
   paidDate     DateTime?
   description  String?
   category     String
-  status       PaymentStatus @default(SUCCESS)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  status       PaymentStatus   @default(SUCCESS)
+  type         TransactionType
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   transactionId String?      @unique
   transaction   Transaction? @relation(fields: [transactionId], references: [id])

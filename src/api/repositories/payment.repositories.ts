@@ -13,23 +13,28 @@ export class PaymentRepository {
 				amount: data.amount,
 				paidDate: data.paidDate,
 				...(data.description ? { description: data.description } : null),
-				status: "PAID", //REVIEW
+				status: "PAID",
 				gymId: gymId,
 				category: data.category,
+				type: data.transactionType,
 			},
 		});
-		if (data.transactionType === "CREDIT") {
-			await client.gymMetrics.update({
-				where: {
-					gymId: gymId,
+		await client.gymMetrics.update({
+			where: {
+				gymId: gymId,
+			},
+			data: {
+				totalRevenue: {
+					...(data.transactionType === "CREDIT"
+						? {
+								increment: data.amount,
+							}
+						: {
+								decrement: data.amount,
+							}),
 				},
-				data: {
-					totalRevenue: {
-						increment: data.amount,
-					},
-				},
-			});
-		}
+			},
+		});
 
 		return { id: payment.id };
 	};
