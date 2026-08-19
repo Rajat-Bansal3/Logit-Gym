@@ -33,11 +33,12 @@ export class GymController {
 		try {
 			this.logger.debug("createGym: request received");
 			const user = req.user;
+			const images = req.files as Express.Multer.File[];
 			if (!user) {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
 			const data = createGymSchema.parse(req.body);
-			const result = await this.gymService.createGym(data, user);
+			const result = await this.gymService.createGym(data, user, images);
 			this.logger.debug("createGym: completed", {
 				userId: user.id,
 			});
@@ -256,7 +257,10 @@ export class GymController {
 					);
 					return res.status(200).json(report_excel_bulkOnboard);
 				}
-
+				/**
+				 * @deprecated
+				 * not to be used only using excel method now for fullness
+				 */
 				case "machineSync": {
 					if (!data.serialNumber) {
 						throw new GymError(

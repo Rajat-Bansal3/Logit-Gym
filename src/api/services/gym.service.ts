@@ -45,6 +45,7 @@ export class GymService {
 	async createGym(
 		data: CreateGym,
 		user: AuthenticatedUser,
+		images?: Express.Multer.File[],
 	): Promise<BaseResponse<{ gymId: string }>> {
 		this.logger.debug("createGym: checking existing gym for owner", {
 			userId: user.id,
@@ -57,9 +58,9 @@ export class GymService {
 			bioPref: data.settings.biometricCodePreference,
 			startingMembershipCode: data.startingMembershipCode,
 		});
-
 		if (data.profile) {
-			await this.gymRepository.createProfile(gym.id, data.profile);
+			const imagePaths = images ? images.map((img) => img.path) : [];
+			await this.gymRepository.createProfile(gym.id, data.profile, imagePaths);
 		}
 
 		this.logger.debug("createGym: success", { gymId: gym.id });

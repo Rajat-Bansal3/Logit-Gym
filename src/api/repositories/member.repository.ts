@@ -46,8 +46,14 @@ const memberWithDetails = {
 
 export type GymOverviewReport = {
 	totalRevenue: number;
-	pendingDues: number;
 	activeMembers: number;
+	expiring: {
+		count: number;
+	};
+	expired: {
+		count: number;
+		dueAmount: number;
+	};
 	inactiveMembers: number;
 	suspendedMembers: number;
 	newMembersInRange: number;
@@ -251,6 +257,7 @@ export class MemberRepository {
 		lastCode: number,
 		input: OnboardMember,
 		gym_username: string,
+		image?: string,
 	): Promise<MemberWithDetails> {
 		const endDate = computeMembershipEndDate(input.membershipStartDate, input.planType);
 
@@ -276,8 +283,8 @@ export class MemberRepository {
 						}),
 						...(input.weight !== undefined && { weight: input.weight }),
 						...(input.height !== undefined && { height: input.height }),
-						...(input.avatarUrl !== undefined && {
-							avatarUrl: input.avatarUrl,
+						...(image !== undefined && {
+							avatarUrl: image,
 						}),
 					},
 				});
@@ -371,9 +378,6 @@ export class MemberRepository {
 				...(input.email !== undefined && { email: input.email ?? null }),
 				...(input.emergencyContact !== undefined && {
 					emergencyContact: input.emergencyContact ?? null,
-				}),
-				...(input.avatarUrl !== undefined && {
-					avatarUrl: input.avatarUrl ?? null,
 				}),
 				...(input.weight !== undefined && { weight: input.weight ?? null }),
 				...(input.height !== undefined && { height: input.height ?? null }),
@@ -547,9 +551,25 @@ export class MemberRepository {
 			...(to !== undefined && { lte: to }),
 		};
 
-		const [metrics, statusCounts, newMembers] = await Promise.all([
+		const [members, metrics, statusCounts, newMembers] = await Promise.all([
+			this.prisma.member.findMany({
+				where: {
+					gymId: gymId,
+				},
+				select: {
+					currentMembership: {
+						select: {
+							endDate: true,
+							membershipAmount: true,
+						},
+					},
+				},
+			}),
 			this.prisma.gymMetrics.findUnique({
 				where: { gymId },
+				select: {
+					totalRevenue: true,
+				},
 			}),
 			this.prisma.member.groupBy({
 				by: ["status"],
@@ -565,6 +585,30 @@ export class MemberRepository {
 				},
 			}),
 		]);
+		const memberMap = {
+			expiring: {
+				count: 0,
+			},
+			expired: {
+				count: 0,
+				dueAmount: 0,
+			},
+		};
+		members.forEach((member) => {
+			const currMemEndDate = member.currentMembership?.endDate;
+			if (!currMemEndDate) {
+				return;
+			}
+			const currDate = new Date();
+			const fiveDaysBeforeEnd = new Date(currMemEndDate.getTime() - 5 * 24 * 60 * 60 * 1000);
+			const amount = member.currentMembership?.membershipAmount || 0;
+			if (currDate > currMemEndDate) {
+				memberMap.expired.count++;
+				memberMap.expired.dueAmount += amount;
+			} else if (currDate >= fiveDaysBeforeEnd && currDate <= currMemEndDate) {
+				memberMap.expiring.count++;
+			}
+		});
 
 		const statusMap = {
 			ACTIVE: 0,
@@ -574,12 +618,12 @@ export class MemberRepository {
 		statusCounts.forEach((row) => {
 			statusMap[row.status] = row._count as number;
 		});
-		console.log(metrics);
 
 		return {
 			totalRevenue: metrics?.totalRevenue ?? 0,
-			pendingDues: metrics?.pendingDues ?? 0,
 			activeMembers: statusMap.ACTIVE ?? 0,
+			expiring: memberMap.expiring,
+			expired: memberMap.expired,
 			inactiveMembers: statusMap.INACTIVE ?? 0,
 			suspendedMembers: statusMap.SUSPENDED ?? 0,
 			newMembersInRange: newMembers,

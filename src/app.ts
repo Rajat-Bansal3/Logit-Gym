@@ -1,3 +1,4 @@
+import path from "node:path";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
@@ -18,6 +19,7 @@ export const createApp = () => {
 			credentials: true,
 		}),
 	);
+	app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 	app.use(express.json({ limit: "10mb" }));
 	app.use(express.urlencoded({ extended: true, limit: "2mb", parameterLimit: 5000 }));

@@ -14,7 +14,6 @@ export const createGymSchema = z.object({
 		ownerContact: z.string(),
 		fitnessProfession: z.string().optional(),
 		amenities: z.array(z.string()).optional(),
-		images: z.array(z.string()).optional(),
 		referralOffer: z.string().optional(),
 	}),
 	settings: z.object({

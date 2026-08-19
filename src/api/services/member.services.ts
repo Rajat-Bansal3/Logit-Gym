@@ -54,6 +54,7 @@ export class MemberService {
 		gymId: string,
 		data: OnboardMember,
 		_user: AuthenticatedUser,
+		image: string,
 	): Promise<BaseResponse<{ memberId: string }>> {
 		this.logger.debug("onboardMember: checking for conflicts", { gymId });
 		const gym = await this.gymRepository.findById({ gymId, isDeleted: false });
@@ -81,6 +82,7 @@ export class MemberService {
 			membershipCode,
 			data,
 			gym.owner.username,
+			image,
 		);
 
 		if (data.isMachine && data.serialNumbers) {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
+import { uploadMultipleImage } from "@/shared/utils/image_upload";
 import { catchAsync } from "../../../shared/utils/util_functions";
 import { GymController } from "../../controller/gym.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
@@ -23,7 +24,12 @@ router.use("/:gymId/members", memberRouter);
 /**
  * Create a new gym
  */
-router.post("/", roleMiddleware("OWNER"), catchAsync(gymController.createGym));
+router.post(
+	"/",
+	roleMiddleware("OWNER"),
+	uploadMultipleImage("gymImage", 5),
+	catchAsync(gymController.createGym),
+);
 router.get("/subscription", roleMiddleware("OWNER"), gymController.getSub);
 router.get("/plans", roleMiddleware("OWNER"), gymController.getPlans);
 router.post("/subscription", roleMiddleware("OWNER"), gymController.createSubscription);

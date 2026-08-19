@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { uploadSingleImage } from "@/shared/utils/image_upload";
 import { MemberController } from "../../controller/member.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { roleMiddleware } from "../../middleware/role.middleware";
@@ -10,7 +11,12 @@ const controller = new MemberController();
 router.use(authMiddleware);
 
 // POST /gyms/:gymId/members — onboard a new member (owner only)
-router.post("/", roleMiddleware("OWNER"), controller.onboardMember);
+router.post(
+	"/",
+	roleMiddleware("OWNER"),
+	uploadSingleImage("memberImage"),
+	controller.onboardMember,
+);
 router.post("/push-member-to-machine", roleMiddleware("OWNER"), controller.pushMemberToMachine);
 
 // GET /gyms/:gymId/members — list all members

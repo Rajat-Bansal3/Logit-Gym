@@ -98,6 +98,7 @@ export class GymRepository {
 	createProfile = async (
 		gymId: string,
 		profile: NonNullable<CreateGym["profile"]>,
+		imagePaths: string[],
 	): Promise<void> => {
 		await this.client.gymProfile.create({
 			data: {
@@ -111,7 +112,7 @@ export class GymRepository {
 				ownerName: profile.ownerName,
 				ownerContact: profile.ownerContact,
 				...(profile.amenities && { amenities: profile.amenities }),
-				...(profile.images && { images: profile.images }),
+				...(imagePaths && { images: imagePaths }),
 
 				...(profile.fitnessProfession && {
 					fitnessProfession: profile.fitnessProfession,
@@ -252,7 +253,6 @@ export class GymRepository {
 				...(profile.ownerName && { ownerName: profile.ownerName }),
 				...(profile.ownerContact && { ownerContact: profile.ownerContact }),
 				...(profile.amenities && { amenities: profile.amenities }),
-				...(profile.images && { images: profile.images }),
 				fitnessProfession: profile.fitnessProfession ?? null,
 				referralOffer: profile.referralOffer ?? null,
 			},

@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/client";
 import type {
 	CreatePaymentInput,
 	CreatePaymentOutput,
@@ -17,16 +18,18 @@ export class PaymentRepository {
 				category: data.category,
 			},
 		});
-		await client.gymMetrics.update({
-			where: {
-				gymId: gymId,
-			},
-			data: {
-				totalRevenue: {
-					increment: data.amount,
+		if (data.transactionType === "CREDIT") {
+			await client.gymMetrics.update({
+				where: {
+					gymId: gymId,
 				},
-			},
-		});
+				data: {
+					totalRevenue: {
+						increment: data.amount,
+					},
+				},
+			});
+		}
 
 		return { id: payment.id };
 	};
@@ -46,7 +49,7 @@ export class PaymentRepository {
 			memberId: string | undefined;
 		},
 	): Promise<GetPaymentsOutput> => {
-		const where = {
+		const where: Prisma.PaymentScalarWhereInput = {
 			gymId,
 			...(memberId && { memberId }),
 			...((startDate || endDate) && {
@@ -76,7 +79,6 @@ export class PaymentRepository {
 				},
 			}),
 		]);
-		console.log(payments);
 		return {
 			payments,
 			pagination: {

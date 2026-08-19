@@ -18,7 +18,6 @@ export const onboardMemberSchema = z.object({
 	email: z.string().optional(),
 	gender: z.string().min(1),
 	emergencyContact: z.string().optional(),
-	avatarUrl: z.string().optional(),
 
 	membershipCode: z.coerce.number().optional(),
 

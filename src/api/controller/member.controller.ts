@@ -33,13 +33,14 @@ export class MemberController {
 
 			const user = req.user;
 			const gymId = req.params.gymId;
+			const image = req.file as Express.Multer.File;
 
 			if (!user || !gymId || Array.isArray(gymId)) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 
 			const data = onboardMemberSchema.parse(req.body);
-			const result = await this.memberService.onboardMember(gymId, data, user);
+			const result = await this.memberService.onboardMember(gymId, data, user, image.path);
 
 			this.logger.debug("onboardMember: completed", { gymId });
 			res.status(201).json(result);
