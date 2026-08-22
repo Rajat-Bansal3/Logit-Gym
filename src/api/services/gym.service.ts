@@ -114,10 +114,17 @@ export class GymService {
 		gymId: string,
 		updates: UpdateGym,
 		user: AuthenticatedUser,
+		images?: Express.Multer.File[],
 	): Promise<BaseResponse<any>> {
-		this.logger.debug("updateGym: updating gym", { gymId });
+		this.logger.debug("updateGym: updating gym", {
+			gymId,
+		});
 
-		const gym = await this.gymRepository.findById({ gymId, isDeleted: false });
+		const gym = await this.gymRepository.findById({
+			gymId,
+			isDeleted: false,
+		});
+
 		if (!gym) {
 			throw new GymError(GymErrorCode.NOT_FOUND, "Gym not found");
 		}
@@ -128,19 +135,37 @@ export class GymService {
 
 		if (updates.name !== undefined || updates.address !== undefined) {
 			await this.gymRepository.update(gymId, {
-				...(updates.name !== undefined && { name: updates.name }),
-				...(updates.address !== undefined && { address: updates.address }),
+				...(updates.name !== undefined && {
+					name: updates.name,
+				}),
+
+				...(updates.address !== undefined && {
+					address: updates.address,
+				}),
 			});
 		}
 
 		if (updates.profile) {
-			await this.gymRepository.upsertProfile(gymId, updates.profile);
+			const retainedImages = updates.profile.images ?? [];
+
+			const newImagePaths = images?.map((file) => file.path) ?? [];
+
+			const finalImages = [...retainedImages, ...newImagePaths];
+
+			this.logger.debug("updateGym: image update", {
+				retainedImages,
+				newImagePaths,
+				finalImages,
+			});
+
+			await this.gymRepository.upsertProfile(gymId, updates.profile, finalImages);
 		}
 
 		const updatedGym = await this.gymRepository.findByIdWithProfile({
 			gymId,
 			isDeleted: false,
 		});
+
 		if (!updatedGym) {
 			throw new GymError(GymErrorCode.NOT_FOUND, "Gym not found after update");
 		}

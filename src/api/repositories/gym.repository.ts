@@ -223,37 +223,69 @@ export class GymRepository {
 			},
 		});
 	};
-	upsertProfile = async (gymId: string, profile: UpdateGym["profile"]): Promise<void> => {
+	upsertProfile = async (
+		gymId: string,
+		profile: UpdateGym["profile"],
+		finalImages?: string[],
+	): Promise<void> => {
 		if (!profile) {
 			return;
 		}
 
 		await this.client.gymProfile.upsert({
 			where: { gymId },
+
 			create: {
 				gymId,
 				timing: profile.timing ?? "09:00 - 21:00",
 				openDays: profile.openDays ?? [],
-				...(profile.instagram && { instagram: profile.instagram }),
+				...(profile.instagram && {
+					instagram: profile.instagram,
+				}),
 				genderAllowed: profile.genderAllowed ?? "ALL",
 				ownerName: profile.ownerName ?? "Unknown",
 				ownerContact: profile.ownerContact ?? "Unknown",
 				amenities: profile.amenities ?? [],
-				images: profile.images ?? [],
+				images: finalImages ?? [],
 				fitnessProfession: profile.fitnessProfession ?? null,
 				referralOffer: profile.referralOffer ?? null,
 			},
+
 			update: {
-				...(profile.timing && { timing: profile.timing }),
-				...(profile.openDays && { openDays: profile.openDays }),
+				...(profile.timing && {
+					timing: profile.timing,
+				}),
+
+				...(profile.openDays && {
+					openDays: profile.openDays,
+				}),
+
 				...(profile.instagram !== undefined && {
 					instagram: profile.instagram,
 				}),
-				...(profile.genderAllowed && { genderAllowed: profile.genderAllowed }),
-				...(profile.ownerName && { ownerName: profile.ownerName }),
-				...(profile.ownerContact && { ownerContact: profile.ownerContact }),
-				...(profile.amenities && { amenities: profile.amenities }),
+
+				...(profile.genderAllowed && {
+					genderAllowed: profile.genderAllowed,
+				}),
+
+				...(profile.ownerName && {
+					ownerName: profile.ownerName,
+				}),
+
+				...(profile.ownerContact && {
+					ownerContact: profile.ownerContact,
+				}),
+
+				...(profile.amenities && {
+					amenities: profile.amenities,
+				}),
+
+				...(finalImages !== undefined && {
+					images: finalImages,
+				}),
+
 				fitnessProfession: profile.fitnessProfession ?? null,
+
 				referralOffer: profile.referralOffer ?? null,
 			},
 		});

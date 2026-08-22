@@ -21,14 +21,14 @@ export const onboardMemberSchema = z.object({
 
 	membershipCode: z.coerce.number().optional(),
 
-	weight: z.number().positive().optional(),
-	height: z.number().positive().optional(),
+	weight: z.coerce.number().positive().optional(),
+	height: z.coerce.number().positive().optional(),
 
 	planType: z.enum(MembershipPlanType),
 	planName: z.string().optional(),
 	membershipStartDate: z.coerce.date(),
-	dueAmount: z.number().min(0).default(0),
-	membershipAmount: z.number().min(1).max(1_00_00_000),
+	dueAmount: z.coerce.number().min(0).default(0),
+	membershipAmount: z.coerce.number().min(1).max(1_00_00_000),
 	isMachine: z.boolean().default(false),
 	serialNumbers: z.array(z.string()).optional(),
 	cardNumber: z.string().optional(),
@@ -61,9 +61,9 @@ export const updateMemberSchema = z.object({
 	email: z.string().email().nullable().optional(),
 	gender: z.string().min(1).optional(),
 	emergencyContact: z.string().nullable().optional(),
-	avatarUrl: z.string().url().nullable().optional(),
-	weight: z.number().positive().nullable().optional(),
-	height: z.number().positive().nullable().optional(),
+	avatarUrl: z.string().nullable().optional(),
+	weight: z.coerce.number().positive().nullable().optional(),
+	height: z.coerce.number().positive().nullable().optional(),
 	status: z.enum(MemberStatus).optional(),
 	dateOfBirth: z.coerce.date().optional(),
 });

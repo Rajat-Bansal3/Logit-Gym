@@ -41,7 +41,12 @@ router.get("/:id", roleMiddleware("OWNER"), catchAsync(gymController.getGym));
 /**
  * Update gym information
  */
-router.patch("/:id", roleMiddleware("OWNER"), catchAsync(gymController.updateGym));
+router.patch(
+	"/:id",
+	roleMiddleware("OWNER"),
+	uploadMultipleImage("gymImages", 5),
+	catchAsync(gymController.updateGym),
+);
 
 router.delete("/delete-machine", roleMiddleware("OWNER"), catchAsync(gymController.removeMachine));
 

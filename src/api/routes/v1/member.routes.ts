@@ -29,7 +29,12 @@ router.get("/:memberId", roleMiddleware("OWNER"), controller.getMember);
 router.get("/:memberId/attendance", roleMiddleware("OWNER"), controller.getMemberAttendanceGym);
 
 // PATCH /gyms/:gymId/members/:memberId
-router.patch("/:memberId", roleMiddleware("OWNER"), controller.updateMember);
+router.patch(
+	"/:memberId",
+	uploadSingleImage("memberImage"),
+	roleMiddleware("OWNER"),
+	controller.updateMember,
+);
 
 // DELETE /gyms/:gymId/members/:memberId — soft delete / deactivate
 router.delete("/:memberId", roleMiddleware("OWNER"), controller.deactivateMember);

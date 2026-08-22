@@ -34,7 +34,7 @@ const imageFilter = (_req: Request, file: Express.Multer.File, cb: FileFilterCal
 	if (isMimeTypeValid && isExtensionValid) {
 		cb(null, true);
 	} else {
-		cb(new Error("Invalid file type. Only JPEG, PNG, WEBP, and GIF images are allowed."));
+		cb(new Error("Invalid file type. Only JPEG, PNG, and WEBP images are allowed."));
 	}
 };
 const uploadConfig = multer({
@@ -64,17 +64,12 @@ export const uploadSingleImage = (fieldName: string = "image") => {
 				});
 			}
 
-			if (!req.file) {
-				return res.status(400).json({
-					success: false,
-					error: `Required image field '${fieldName}' is missing or empty.`,
-				});
-			}
 
 			return next();
 		});
 	};
 };
+
 export const uploadMultipleImage = (fieldName: string = "images", maxCount: number = 5) => {
 	return (req: Request, res: Response, next: NextFunction) => {
 		const upload = uploadConfig.array(fieldName, maxCount);
@@ -87,24 +82,24 @@ export const uploadMultipleImage = (fieldName: string = "images", maxCount: numb
 						error: "One or more files exceed the maximum limit of 5MB.",
 					});
 				}
+
 				if (err.code === "LIMIT_UNEXPECTED_FILE") {
 					return res.status(400).json({
 						success: false,
 						error: `Exceeded maximum limit of ${maxCount} files for field '${fieldName}'.`,
 					});
 				}
-				return res.status(400).json({ success: false, error: err.message });
-			} else if (err) {
+
 				return res.status(400).json({
 					success: false,
 					error: err.message,
 				});
 			}
 
-			if (!req.files || (Array.isArray(req.files) && req.files.length === 0)) {
+			if (err) {
 				return res.status(400).json({
 					success: false,
-					error: `Required image field '${fieldName}' is missing or empty.`,
+					error: err.message,
 				});
 			}
 

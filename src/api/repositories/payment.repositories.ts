@@ -8,6 +8,10 @@ import { client } from "../../shared/utils/prisma";
 
 export class PaymentRepository {
 	createPayment = async (gymId: string, data: CreatePaymentInput): Promise<CreatePaymentOutput> => {
+		console.log("💰 CREATE PAYMENT");
+		console.log("amount:", data.amount);
+		console.log("transactionType:", data.transactionType);
+		console.log("transactionType type:", typeof data.transactionType);
 		const payment = await client.payment.create({
 			data: {
 				amount: data.amount,

@@ -71,17 +71,41 @@ export class GymController {
 			this.logger.debug("updateGym: request received", {
 				gymId: req.params.id,
 			});
+
 			const user = req.user;
 			const gymId = req.params.id;
+
 			if (!user || !gymId || Array.isArray(gymId)) {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
+
+			const images = req.files as Express.Multer.File[] | undefined;
+
+			this.logger.debug("updateGym: uploaded files", {
+				count: images?.length ?? 0,
+				files: images?.map((file) => ({
+					filename: file.filename,
+					path: file.path,
+					size: file.size,
+					mimetype: file.mimetype,
+				})),
+			});
+
 			const updates = updateGymSchema.parse(req.body);
-			const result = await this.gymService.updateGym(gymId, updates, user);
-			this.logger.debug("updateGym: completed", { gymId });
+
+			const result = await this.gymService.updateGym(gymId, updates, user, images);
+
+			this.logger.debug("updateGym: completed", {
+				gymId,
+			});
+
 			res.status(200).json(result);
 		} catch (error) {
-			this.logger.error("updateGym: error", { gymId: req.params.id, error });
+			this.logger.error("updateGym: error", {
+				gymId: req.params.id,
+				error,
+			});
+
 			next(error);
 		}
 	};

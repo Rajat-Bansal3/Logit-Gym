@@ -49,21 +49,34 @@ export const createGymSchema = z.object({
 
 export const updateGymSchema = z.object({
 	name: z.string().min(1).optional(),
+
 	address: z.string().min(1).optional(),
-	profile: z
-		.object({
-			timing: z.string().optional(),
-			openDays: z.array(z.string()).optional(),
-			instagram: z.string().optional(),
-			genderAllowed: z.string().optional(),
-			ownerName: z.string().optional(),
-			ownerContact: z.string().optional(),
-			fitnessProfession: z.string().optional(),
-			amenities: z.array(z.string()).optional(),
-			images: z.array(z.string()).optional(),
-			referralOffer: z.string().optional(),
-		})
-		.optional(),
+
+	profile: parseJson(
+		z
+			.object({
+				timing: z.string().optional(),
+
+				openDays: z.array(z.string()).optional(),
+
+				instagram: z.string().optional(),
+
+				genderAllowed: z.string().optional(),
+
+				ownerName: z.string().optional(),
+
+				ownerContact: z.string().optional(),
+
+				fitnessProfession: z.string().optional(),
+
+				amenities: z.array(z.string()).optional(),
+
+				images: z.array(z.string()).optional(),
+
+				referralOffer: z.string().optional(),
+			})
+			.optional(),
+	),
 });
 
 export const addMachineSchema = z.object({

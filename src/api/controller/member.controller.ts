@@ -33,14 +33,14 @@ export class MemberController {
 
 			const user = req.user;
 			const gymId = req.params.gymId;
-			const image = req.file as Express.Multer.File;
+			const image = req.file as Express.Multer.File | undefined;
 
 			if (!user || !gymId || Array.isArray(gymId)) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 
 			const data = onboardMemberSchema.parse(req.body);
-			const result = await this.memberService.onboardMember(gymId, data, user, image.path);
+			const result = await this.memberService.onboardMember(gymId, data, user, image?.path);
 
 			this.logger.debug("onboardMember: completed", { gymId });
 			res.status(201).json(result);
@@ -160,10 +160,28 @@ export class MemberController {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
 			}
 
-			const data = updateMemberSchema.parse(req.body);
-			const result = await this.memberService.updateMember(memberId, gymId, data, user);
+			const image = req.file as Express.Multer.File | undefined;
 
-			this.logger.debug("updateMember: completed", { gymId, memberId });
+			this.logger.debug("updateMember: image", {
+				hasImage: !!image,
+				imagePath: image?.path,
+			});
+
+			const data = updateMemberSchema.parse(req.body);
+
+			const result = await this.memberService.updateMember(
+				memberId,
+				gymId,
+				data,
+				user,
+				image?.path,
+			);
+
+			this.logger.debug("updateMember: completed", {
+				gymId,
+				memberId,
+			});
+
 			res.status(200).json(result);
 		} catch (error) {
 			this.logger.error("updateMember: error", {
@@ -171,6 +189,7 @@ export class MemberController {
 				memberId: req.params.memberId,
 				error,
 			});
+
 			next(error);
 		}
 	};

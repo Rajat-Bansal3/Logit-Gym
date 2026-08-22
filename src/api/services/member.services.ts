@@ -54,7 +54,7 @@ export class MemberService {
 		gymId: string,
 		data: OnboardMember,
 		_user: AuthenticatedUser,
-		image: string,
+		image?: string,
 	): Promise<BaseResponse<{ memberId: string }>> {
 		this.logger.debug("onboardMember: checking for conflicts", { gymId });
 		const gym = await this.gymRepository.findById({ gymId, isDeleted: false });
@@ -202,16 +202,22 @@ export class MemberService {
 		gymId: string,
 		data: UpdateMember,
 		__user: AuthenticatedUser,
+		image?: string,
 	): Promise<BaseResponse<MemberWithDetails>> {
-		this.logger.debug("updateMember: fetching member", { memberId, gymId });
+		this.logger.debug("updateMember: fetching member", {
+			memberId,
+			gymId,
+		});
 
 		const member = await this.memberRepository.findByIdAndGym(memberId, gymId);
+
 		if (!member) {
 			throw new MemberError(MemberErrorCode.NOT_FOUND);
 		}
 
 		if (data.phone !== undefined && data.phone !== member.phone) {
 			const existingPhone = await this.memberRepository.findByPhone(data.phone, gymId);
+
 			if (existingPhone) {
 				throw new MemberError(
 					MemberErrorCode.CONFLICT,
@@ -220,9 +226,18 @@ export class MemberService {
 			}
 		}
 
+		// New uploaded image
+		if (image !== undefined) {
+			data.avatarUrl = image;
+		}
+
 		const updated = await this.memberRepository.update(memberId, data);
 
-		this.logger.debug("updateMember: success", { memberId });
+		this.logger.debug("updateMember: success", {
+			memberId,
+			hasNewImage: image !== undefined,
+		});
+
 		return {
 			message: "Member updated successfully",
 			success: true,

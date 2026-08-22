@@ -382,6 +382,9 @@ export class MemberRepository {
 				...(input.weight !== undefined && { weight: input.weight ?? null }),
 				...(input.height !== undefined && { height: input.height ?? null }),
 				...(input.dateOfBirth && { age: computeAge(input.dateOfBirth) }),
+				...(input.avatarUrl !== undefined && {
+					avatarUrl: input.avatarUrl,
+				}),
 			},
 			include: memberWithDetails,
 		});
