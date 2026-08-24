@@ -68,7 +68,6 @@ export class PaymentRepository {
 				},
 			}),
 		};
-		console.log(startDate, endDate);
 		const [total, payments] = await Promise.all([
 			client.payment.count({ where }),
 			client.payment.findMany({
@@ -88,8 +87,22 @@ export class PaymentRepository {
 				},
 			}),
 		]);
+		const out = payments.reduce(
+			(acc, curr) => ({
+				acc,
+				totalRevenue: acc.totalRevenue + (curr.type === "CREDIT" ? curr.amount : 0),
+				totalExpense: acc.totalExpense + (curr.type === "DEBIT" ? curr.amount : 0),
+			}),
+			{
+				totalExpense: 0,
+				totalRevenue: 0,
+			},
+		);
 		return {
 			payments,
+			netRevenue: out.totalRevenue - out.totalExpense,
+			totalExpense: out.totalExpense,
+			totalRevenue: out.totalRevenue,
 			pagination: {
 				total,
 				current: page,
