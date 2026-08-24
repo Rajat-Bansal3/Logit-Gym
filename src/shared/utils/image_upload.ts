@@ -64,7 +64,6 @@ export const uploadSingleImage = (fieldName: string = "image") => {
 				});
 			}
 
-
 			return next();
 		});
 	};

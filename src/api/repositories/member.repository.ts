@@ -337,6 +337,7 @@ export class MemberRepository {
 							membershipId: membership.id,
 							category: "Membership",
 							paidDate: new Date(),
+							type: "CREDIT",
 						},
 					});
 					await tx.gymMetrics.update({
@@ -963,6 +964,7 @@ export class MemberRepository {
 						memberId: memberId,
 						membershipId: curr_membership.id,
 						gymId: curr_membership.member.gymId,
+						type: "CREDIT",
 						category: "Membership",
 					},
 				});
