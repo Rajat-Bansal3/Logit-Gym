@@ -28,6 +28,9 @@ export const getPaymentsQuerySchema = z.object({
 
 export type GetPaymentsOutput = {
 	payments: Payment[];
+	netRevenue: number;
+	totalRevenue: number;
+	totalExpense: number;
 	pagination: paginationReturnType;
 };
 export const createMembershipSchema = z.object({
