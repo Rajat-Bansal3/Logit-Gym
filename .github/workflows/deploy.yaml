@@ -18,7 +18,7 @@ jobs:
       - name: Deploy
         shell: powershell
         run: |
-          Set-Location -Path "$env:USERPROFILE\Desktop\synapse\Logit-gym"
+          Set-Location -Path "C:\Users\Administrator\Desktop\synapse\Logit-Gym"
           git fetch origin main
           git reset --hard origin/main
           bun install --frozen-lockfile
