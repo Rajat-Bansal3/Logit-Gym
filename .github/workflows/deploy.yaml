@@ -14,13 +14,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: C:\synapse\Logit-Gym
 
       - name: Install, Build and Start
         shell: powershell
         run: |
-          Set-Location -Path "C:\synapse\Logit-Gym"
           bun install --frozen-lockfile
           bunx prisma migrate deploy
           bunx prisma generate
