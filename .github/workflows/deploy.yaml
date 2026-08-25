@@ -4,30 +4,26 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      # - name: SSH to Windows Server & Update PM2
-      #   uses: appleboy/ssh-action@v1.0.3
-      #   with:
-      #     host: ${{ secrets.SERVER_HOST }}
-      #     username: ${{ secrets.SERVER_USER }}
-      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
-      #     script_stop: true
-      #     script: |
-      #       nc -zv ${{ secrets.SERVER_HOST }} 22 -w 10
-      #       Set-Location "$HOME\Desktop\synapse\Logit-gym"
-      #       git pull origin main
-      #       bun install
-      #       bunx prisma generate
-      #       bun run build
-      #       pm2 reload ecosystem.config.js
-      - name: Debugging
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy
+        shell: powershell
         run: |
-          echo "Runner IP:"
-          curl -s https://api.ipify.org
-          echo "Resolving host:"
-          nslookup ${{ secrets.SERVER_HOST }}
-          echo "Port check:"
-          nc -zv ${{ secrets.SERVER_HOST }} 22 -w 10
+          Set-Location -Path "$env:USERPROFILE\Desktop\synapse\Logit-gym"
+          git fetch origin main
+          git reset --hard origin/main
+          bun install --frozen-lockfile
+          bunx prisma migrate deploy
+          bunx prisma generate
+          bun run build
+          pm2 startOrReload ecosystem.config.js --update-env
+          pm2 save
