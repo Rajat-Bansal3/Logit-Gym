@@ -18,9 +18,11 @@ jobs:
       - name: Install, Build and Start
         shell: powershell
         run: |
-          bun install --frozen-lockfile
-          bunx prisma migrate deploy
-          bunx prisma generate
-          bun run build
-          pm2 startOrReload ecosystem.config.js --update-env
-          pm2 save
+          $bun = "C:\bun\bin\bun.exe"
+          $pm2 = "C:\Users\Administrator\AppData\Roaming\npm\pm2.cmd"
+          $bun install --frozen-lockfile
+          $bun x prisma migrate deploy
+          $bun x prisma generate
+          $bun run build
+          $pm2 startOrReload ecosystem.config.js --update-env
+          $pm2 save
