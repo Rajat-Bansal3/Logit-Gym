@@ -313,9 +313,6 @@ export class MemberController {
 
 	getAttendanceReport = async (req: Request, res: Response, next: NextFunction) => {
 		try {
-			this.logger.debug("getAttendanceReport: request received", {
-				gymId: req.params.gymId,
-			});
 			const user = req.user;
 			const gymId = req.params.gymId;
 			if (!user || !gymId || Array.isArray(gymId)) {
@@ -363,7 +360,7 @@ export class MemberController {
 
 	getMemberAttendance = async (req: Request, res: Response, next: NextFunction) => {
 		try {
-			this.logger.debug("getMemberAttendance: request received");
+			this.logger.debug("getMemberAttendance: request received , 0101010");
 			const user = req.user;
 			if (!user?.memberId) {
 				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
@@ -376,7 +373,7 @@ export class MemberController {
 	};
 	getMemberAttendanceGym = async (req: Request, res: Response, next: NextFunction) => {
 		try {
-			this.logger.debug("getMemberAttendance: request received");
+			this.logger.debug("getMemberAttendance: request received , 10101011001");
 			const user = req.user;
 			const memberId = req.params.memberId;
 			if (!user?.gymId) {

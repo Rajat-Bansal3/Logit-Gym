@@ -4,7 +4,11 @@ import express from "express";
 import helmet from "helmet";
 import { WebhookController } from "./api/controller/webhook.controller";
 import { errorHandler } from "./api/middleware/error.middleware";
-import { httpLogger, requestIdMiddleware, requestLogger } from "./api/middleware/logger.middleware";
+// import {
+// httpLogger,
+// requestIdMiddleware,
+// requestLogger,
+// } from "./api/middleware/logger.middleware";
 import { notFoundHandler } from "./api/middleware/not-found.middleware";
 import { env } from "./env";
 import { appLogger } from "./shared/utils/logger";
@@ -24,9 +28,9 @@ export const createApp = () => {
 	app.use(express.json({ limit: "10mb" }));
 	app.use(express.urlencoded({ extended: true, limit: "2mb", parameterLimit: 5000 }));
 
-	app.use(requestIdMiddleware);
-	app.use(httpLogger);
-	app.use(requestLogger);
+	// app.use(requestIdMiddleware);
+	// app.use(httpLogger);
+	// app.use(requestLogger);
 
 	const webhookController = new WebhookController();
 

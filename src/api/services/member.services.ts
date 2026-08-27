@@ -326,6 +326,12 @@ export class MemberService {
 		if (!member || !member) {
 			throw new MemberError(MemberErrorCode.BAD_REQUEST, "member not found");
 		}
+		if (member.isDeleted === true) {
+			return {
+				message: `member is deleted`,
+				success: true,
+			};
+		}
 
 		if (member.gym.hash !== data.gym_hash) {
 			throw new MemberError(MemberErrorCode.UNAUTHORIZED, "member not from this gym");
