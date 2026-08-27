@@ -45,7 +45,7 @@ router.delete("/delete/:memberId", roleMiddleware("OWNER"), controller.deleteMem
 // ── Reports ───────────────────────────────────────────────────────────────────
 router.get("/reports/overview", roleMiddleware("OWNER"), controller.getGymOverviewReport);
 
-router.get("/reports/attendance", roleMiddleware("OWNER"), controller.getAttendanceReport);
+router.get("/reports/attendances", roleMiddleware("OWNER"), controller.getAttendanceReport);
 
 router.get("/reports/metrics", roleMiddleware("OWNER"), controller.getMemberMetricsReport);
 

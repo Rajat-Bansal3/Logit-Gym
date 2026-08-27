@@ -24,7 +24,6 @@ export const authMiddleware = async (req: Request, _res: Response, next: NextFun
 		}
 
 		req.user = validation.user;
-		logger.debug("User authenticated", { userId: validation.user.id });
 		next();
 		return;
 	} catch (error) {
