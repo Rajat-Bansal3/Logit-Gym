@@ -13,7 +13,7 @@ export const days = [
 export const onboardMemberSchema = z.object({
 	name: z.string().min(1),
 	dateOfBirth: z.coerce.date(),
-	address: z.string().min(1).optional(),
+	address: z.string().optional(),
 	phone: z.string().min(1),
 	email: z.string().optional(),
 	gender: z.string().min(1),
@@ -56,7 +56,7 @@ const daysEnum = z.enum([
 
 export const updateMemberSchema = z.object({
 	name: z.string().min(1).optional(),
-	address: z.string().min(1).optional(),
+	address: z.string().optional(),
 	phone: z.string().min(1).optional(),
 	email: z.string().email().nullable().optional(),
 	gender: z.string().min(1).optional(),
