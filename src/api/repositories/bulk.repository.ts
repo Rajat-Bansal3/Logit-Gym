@@ -191,7 +191,7 @@ export class BulkRepository {
 							Prisma.sql`(
               ${cuid()},
               ${member!.id},
-              "CREDIT",
+              'CREDIT'::"TransactionType",
               ${membership!.id},
               ${gymId},
               ${m.data.membershipAmount},
