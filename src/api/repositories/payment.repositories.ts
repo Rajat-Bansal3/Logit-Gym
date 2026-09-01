@@ -68,7 +68,7 @@ export class PaymentRepository {
 				},
 			}),
 		};
-		const [total, payments] = await Promise.all([
+		const [total, payments, revenuePayments] = await Promise.all([
 			client.payment.count({ where }),
 			client.payment.findMany({
 				where,
@@ -86,8 +86,22 @@ export class PaymentRepository {
 					},
 				},
 			}),
+			client.payment.findMany({
+				where,
+				orderBy: {
+					paidDate: "desc",
+				},
+				include: {
+					member: {
+						select: {
+							id: true,
+							name: true,
+						},
+					},
+				},
+			}),
 		]);
-		const out = payments.reduce(
+		const out = revenuePayments.reduce(
 			(acc, curr) => ({
 				acc,
 				totalRevenue: acc.totalRevenue + (curr.type === "CREDIT" ? curr.amount : 0),

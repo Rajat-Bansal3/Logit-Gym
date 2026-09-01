@@ -181,7 +181,7 @@ export class BulkRepository {
 				if (paidMembers.length > 0) {
 					await tx.$queryRaw`
         INSERT INTO payments (
-          id, "memberId", "membershipId", "gymId",
+          id, "memberId","type", "membershipId", "gymId",
           amount, category, status, "paidDate",
           "createdAt", "updatedAt"
         )
@@ -191,6 +191,7 @@ export class BulkRepository {
 							Prisma.sql`(
               ${cuid()},
               ${member!.id},
+              "CREDIT",
               ${membership!.id},
               ${gymId},
               ${m.data.membershipAmount},
