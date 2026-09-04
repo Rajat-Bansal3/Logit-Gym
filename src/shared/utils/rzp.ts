@@ -11,12 +11,13 @@ export async function createRZPPlan(plan: {
 	name: string;
 	amount: number;
 	billingCycle: BillingCycle;
+	interval: number;
 }): Promise<string> {
 	const rzpPlan = await razorpay.plans.create({
 		period: ["MONTHLY", "QUARTERLY", "HALF_YEARLY"].includes(plan.billingCycle)
 			? "monthly"
 			: "yearly",
-		interval: 1,
+		interval: plan.interval,
 		item: {
 			name: plan.name,
 			amount: plan.amount * 100,

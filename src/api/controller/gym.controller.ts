@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import * as xlsx from "xlsx";
+import { createRZPPlan } from "@/shared/utils/rzp";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import {
 	addMachineSchema,
@@ -188,17 +189,18 @@ export class GymController {
 		}
 	};
 	createTrailPlan = async (_req: Request, res: Response, _next: NextFunction) => {
-		// const plan = await createRZPPlan({
-		//   amount: 1000,
-		//   billingCycle: "MONTHLY",
-		//   name: "TRIAL",
-		// });
+		const plan = await createRZPPlan({
+			amount: 1999,
+			billingCycle: "QUARTERLY",
+			name: "Quanterly Plan",
+			interval: 3,
+		});
 		await client.plan.create({
 			data: {
-				billingCycle: "TRIAL",
-				name: "TRIAL",
+				billingCycle: "QUARTERLY",
+				name: "Quanterly Plan",
 				price: 1000,
-				razorpayId: "trial_plan",
+				razorpayId: plan,
 			},
 		});
 		res.status(200).json({});
