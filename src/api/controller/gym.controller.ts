@@ -1,6 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
 import * as xlsx from "xlsx";
-import { createRZPPlan } from "@/shared/utils/rzp";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import {
 	addMachineSchema,
@@ -14,6 +13,7 @@ import {
 } from "../../shared/types/gym.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
+import { createRZPPlan } from "../../shared/utils/rzp";
 import { GymService } from "../services/gym.service";
 import { MemberService } from "../services/member.services";
 
