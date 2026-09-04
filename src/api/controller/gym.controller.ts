@@ -191,14 +191,14 @@ export class GymController {
 	createTrailPlan = async (_req: Request, res: Response, _next: NextFunction) => {
 		const plan = await createRZPPlan({
 			amount: 1999,
-			billingCycle: "QUARTERLY",
-			name: "Quanterly Plan",
-			interval: 3,
+			billingCycle: "HALF_YEARLY",
+			name: "Half Yearly Plan",
+			interval: 6,
 		});
 		await client.plan.create({
 			data: {
-				billingCycle: "QUARTERLY",
-				name: "Quanterly Plan",
+				billingCycle: "HALF_YEARLY",
+				name: "Half Yearly Plan",
 				price: 1000,
 				razorpayId: plan,
 			},
