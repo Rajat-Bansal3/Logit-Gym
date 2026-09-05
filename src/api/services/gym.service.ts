@@ -17,7 +17,11 @@ import type {
 import type { BaseResponse } from "../../shared/types/returns";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
-import { createRZPPlan, createRZPSubscription } from "../../shared/utils/rzp";
+import {
+	createRZPPlan,
+	createRZPSubscription,
+	deleteRZPSubscription,
+} from "../../shared/utils/rzp";
 import { s3 } from "../../shared/utils/s3";
 import { ALLOWED_MIMETYPES } from "../../shared/utils/util_functions";
 import { BulkRepository, type createManyAttendanceType } from "../repositories/bulk.repository";
@@ -272,8 +276,26 @@ export class GymService {
 		if (existingSub) {
 			throw new GymError(GymErrorCode.CONFLICT, "Gym already has an active subscription");
 		}
+		if (plan.billingCycle === "TRIAL") {
+			await this.planRepository.createSub(gymId, plan.id, "trial_sub", plan);
+
+			return {
+				message: "successfully created subscription",
+				data: "trial",
+				success: true,
+			};
+		}
 		const subscription = await createRZPSubscription(plan.razorpayId, gymId);
-		await this.planRepository.createSub(gymId, plan.id, subscription.id);
+		try {
+			await this.planRepository.createSub(gymId, plan.id, subscription.id, plan);
+		} catch (error) {
+			await deleteRZPSubscription(subscription.id);
+			return {
+				message: "no subscription created, cancelled",
+				data: error,
+				success: false,
+			};
+		}
 		return {
 			message: "successfully created subscription",
 			data: subscription.short_url,

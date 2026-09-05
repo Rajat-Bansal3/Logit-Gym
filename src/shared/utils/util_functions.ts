@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { MembershipPlanType } from "../../generated/enums";
+import { type BillingCycle, MembershipPlanType } from "../../generated/enums";
 import { appLogger } from "./logger";
 
 /**
@@ -31,6 +31,28 @@ export function computeMembershipEndDate(start: Date, planType: MembershipPlanTy
 		[MembershipPlanType.YEARLY]: 12,
 	};
 	end.setMonth(end.getMonth() + monthsMap[planType]);
+	return end;
+}
+
+export function computePeriodEnd(start: Date, billingCycle: BillingCycle): Date {
+	const end = new Date(start);
+	switch (billingCycle) {
+		case "TRIAL":
+			end.setDate(end.getDate() + 7);
+			break;
+		case "MONTHLY":
+			end.setMonth(end.getMonth() + 1);
+			break;
+		case "QUARTERLY":
+			end.setMonth(end.getMonth() + 3);
+			break;
+		case "HALF_YEARLY":
+			end.setMonth(end.getMonth() + 6);
+			break;
+		case "YEARLY":
+			end.setFullYear(end.getFullYear() + 1);
+			break;
+	}
 	return end;
 }
 

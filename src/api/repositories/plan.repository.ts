@@ -5,6 +5,7 @@ import type {
 	Subscription,
 	SubscriptionStatus,
 } from "../../generated/client";
+import { computePeriodEnd } from "../../shared/utils/util_functions";
 
 export type gym_with_sub = Prisma.GymGetPayload<{
 	include: {
@@ -69,23 +70,17 @@ export class PlanRepository {
 		gymId: string,
 		planId: string,
 		gatewaySubscriptionId: string,
+		plan: Plan,
 	): Promise<Subscription> => {
-		const plan = await this.prisma.plan.findUnique({
-			where: { id: planId },
-		});
-		if (!plan) {
-			throw new Error("Plan not found");
-		}
-
 		const currentPeriodStart = new Date();
-		const currentPeriodEnd = this.computePeriodEnd(currentPeriodStart, plan.billingCycle);
+		const currentPeriodEnd = computePeriodEnd(currentPeriodStart, plan.billingCycle);
 
 		return await this.prisma.$transaction(async (tx) => {
 			const sub = await tx.subscription.create({
 				data: {
 					gymId,
 					planId,
-					status: "TRIALING",
+					status: plan.billingCycle === "TRIAL" ? "TRIALING" : "ACTIVE",
 					currentPeriodStart,
 					currentPeriodEnd,
 					cancelAtPeriodEnd: false,
@@ -97,7 +92,7 @@ export class PlanRepository {
 				where: { id: gymId },
 				data: {
 					currentSubscriptionId: sub.id,
-					subscriptionStatus: "TRIALING",
+					subscriptionStatus: plan.billingCycle === "TRIAL" ? "TRIALING" : "ACTIVE",
 				},
 			});
 
@@ -183,23 +178,4 @@ export class PlanRepository {
 			});
 		});
 	};
-
-	private computePeriodEnd(start: Date, billingCycle: string): Date {
-		const end = new Date(start);
-		switch (billingCycle) {
-			case "MONTHLY":
-				end.setMonth(end.getMonth() + 1);
-				break;
-			case "QUARTERLY":
-				end.setMonth(end.getMonth() + 3);
-				break;
-			case "HALF_YEARLY":
-				end.setMonth(end.getMonth() + 6);
-				break;
-			case "YEARLY":
-				end.setFullYear(end.getFullYear() + 1);
-				break;
-		}
-		return end;
-	}
 }

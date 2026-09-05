@@ -1,6 +1,7 @@
 import Razorpay from "razorpay";
 import { env } from "../../env";
 import type { BillingCycle } from "../../generated/enums";
+import { appLogger } from "./logger";
 
 export const razorpay = new Razorpay({
 	key_id: env.RAZORPAY_KEY_ID,
@@ -36,4 +37,16 @@ export async function createRZPSubscription(planId: string, gymId: string) {
 		},
 	});
 	return rzpSub;
+}
+export async function deleteRZPSubscription(subId: string) {
+	try {
+		await razorpay.subscriptions.cancel(subId);
+	} catch (e) {
+		appLogger.warn(
+			"XXXXXXXXXXXXXXXXXX  failed to cancel rzp sub, cancel Manually xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			{
+				error: e,
+			},
+		);
+	}
 }

@@ -1,7 +1,8 @@
 import type { Gym, Prisma, PrismaClient } from "../../generated/client";
-import type { BillingCycle, BioPref } from "../../generated/enums";
+import type { BioPref } from "../../generated/enums";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import type { CreateGym, CreatePlanRepoInput, UpdateGym } from "../../shared/types/gym.types";
+import { computePeriodEnd } from "../../shared/utils/util_functions";
 
 type gym_including_owner = Prisma.GymGetPayload<{
 	include: {
@@ -65,7 +66,7 @@ export class GymRepository {
 				where: { isActive: true, name: "TRIAL" },
 			});
 			if (!plan) {
-				throw new GymError(GymErrorCode.NOT_FOUND, "no active trail found");
+				throw new GymError(GymErrorCode.NOT_FOUND, "no active triall found");
 			}
 
 			const curr = computePeriodEnd(new Date(), plan.billingCycle);
@@ -306,25 +307,4 @@ export class GymRepository {
 			},
 		});
 	};
-}
-function computePeriodEnd(date: Date, cycle: BillingCycle): Date {
-	const end = new Date(date);
-	switch (cycle) {
-		case "TRIAL":
-			end.setDate(end.getDate() + 7);
-			break;
-		case "MONTHLY":
-			end.setMonth(end.getMonth() + 1);
-			break;
-		case "QUARTERLY":
-			end.setMonth(end.getMonth() + 3);
-			break;
-		case "HALF_YEARLY":
-			end.setMonth(end.getMonth() + 6);
-			break;
-		case "YEARLY":
-			end.setFullYear(end.getFullYear() + 1);
-			break;
-	}
-	return end;
 }
