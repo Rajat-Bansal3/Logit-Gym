@@ -18,6 +18,7 @@ const envSchema = z.object({
 	RAZORPAY_KEY_SECRET: z.coerce.string(),
 	RAZORPAY_WEBHOOK_SECRET: z.coerce.string(),
 	NODE_ENV: z.enum(["development", "testing", "production"]).default("development"),
+	PLANS_API_KEY: z.string().min(1),
 });
 const data = envSchema.safeParse(process.env);
 if (!data.success) {

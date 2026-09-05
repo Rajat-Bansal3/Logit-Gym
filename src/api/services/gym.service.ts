@@ -9,6 +9,7 @@ import type { AuthenticatedUser } from "../../shared/types/auth.types";
 import type {
 	AddMachine,
 	CreateGym,
+	CreatePlanInput,
 	CreateSubscription,
 	SyncData,
 	UpdateGym,
@@ -16,7 +17,7 @@ import type {
 import type { BaseResponse } from "../../shared/types/returns";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
-import { createRZPSubscription } from "../../shared/utils/rzp";
+import { createRZPPlan, createRZPSubscription } from "../../shared/utils/rzp";
 import { s3 } from "../../shared/utils/s3";
 import { ALLOWED_MIMETYPES } from "../../shared/utils/util_functions";
 import { BulkRepository, type createManyAttendanceType } from "../repositories/bulk.repository";
@@ -339,6 +340,31 @@ export class GymService {
 			message: "successfully synced",
 			success: true,
 			data: data.length,
+		};
+	};
+	createPlan = async (
+		planData: CreatePlanInput,
+	): Promise<BaseResponse<{ name: string; active: boolean }>> => {
+		if (planData.apiKey !== env.PLANS_API_KEY) {
+			return {
+				message: "auth failed",
+				success: false,
+			};
+		}
+		const rzp_planID = await createRZPPlan({
+			amount: planData.planAmount,
+			billingCycle: planData.billing_cycle,
+			interval: planData.interval,
+			name: planData.plan_name,
+		});
+		const repoPlan = await this.gymRepository.createPlan({
+			...planData,
+			rzp_planID,
+		});
+		return {
+			message: "plan created successfully",
+			success: true,
+			data: { name: repoPlan.name, active: repoPlan.isActive },
 		};
 	};
 	private utcDate(deviceTime: string) {

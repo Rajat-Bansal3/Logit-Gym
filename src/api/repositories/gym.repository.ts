@@ -1,7 +1,7 @@
 import type { Gym, Prisma, PrismaClient } from "../../generated/client";
 import type { BillingCycle, BioPref } from "../../generated/enums";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
-import type { CreateGym, UpdateGym } from "../../shared/types/gym.types";
+import type { CreateGym, CreatePlanRepoInput, UpdateGym } from "../../shared/types/gym.types";
 
 type gym_including_owner = Prisma.GymGetPayload<{
 	include: {
@@ -294,6 +294,16 @@ export class GymRepository {
 		return this.client.member.findUnique({
 			where: { userId },
 			select: { gymId: true },
+		});
+	};
+	createPlan = async (planData: CreatePlanRepoInput) => {
+		return await this.client.plan.create({
+			data: {
+				billingCycle: planData.billing_cycle,
+				name: planData.plan_name,
+				price: planData.planAmount,
+				razorpayId: planData.rzp_planID,
+			},
 		});
 	};
 }

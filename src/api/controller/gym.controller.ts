@@ -6,6 +6,7 @@ import {
 	bulkAddSchema,
 	bulkMembersSchema,
 	createGymSchema,
+	createPlanSchema,
 	createSubscriptionSchema,
 	getPresignedUrlsSchema,
 	syncDataSchema,
@@ -13,7 +14,6 @@ import {
 } from "../../shared/types/gym.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
-import { createRZPPlan } from "../../shared/utils/rzp";
 import { GymService } from "../services/gym.service";
 import { MemberService } from "../services/member.services";
 
@@ -188,22 +188,10 @@ export class GymController {
 			return;
 		}
 	};
-	createTrailPlan = async (_req: Request, res: Response, _next: NextFunction) => {
-		const plan = await createRZPPlan({
-			amount: 1999,
-			billingCycle: "HALF_YEARLY",
-			name: "Half Yearly Plan",
-			interval: 6,
-		});
-		await client.plan.create({
-			data: {
-				billingCycle: "HALF_YEARLY",
-				name: "Half Yearly Plan",
-				price: 1000,
-				razorpayId: plan,
-			},
-		});
-		res.status(200).json({});
+	createPlan = async (req: Request, res: Response, _next: NextFunction) => {
+		const data = createPlanSchema.parse(req.body);
+		const plan = await this.gymService.createPlan(data);
+		res.status(200).json(plan);
 	};
 	getSub = async (req: Request, res: Response, next: NextFunction) => {
 		try {

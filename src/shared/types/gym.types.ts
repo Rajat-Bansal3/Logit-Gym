@@ -1,5 +1,5 @@
 import z from "zod";
-import { BioPref, MembershipPlanType } from "../../generated/enums";
+import { BillingCycle, BioPref, MembershipPlanType } from "../../generated/enums";
 import type { OnboardMember } from "./member.types";
 
 const parseJson = <T extends z.ZodTypeAny>(schema: T) =>
@@ -125,6 +125,16 @@ export const bulkMembersSchema = z.array(
 		StartDate: z.coerce.date(),
 	}),
 );
+export const createPlanSchema = z.object({
+	apiKey: z.string().min(10).max(20),
+	plan_name: z.string(),
+	billing_cycle: z.enum(BillingCycle),
+	planAmount: z.number(),
+	interval: z.number(),
+});
+export type CreatePlanInput = z.infer<typeof createPlanSchema>;
+export type CreatePlanRepoInput = CreatePlanInput & { rzp_planID: string };
+
 export type ValidMember = {
 	membershipCode: number;
 	data: OnboardMember;
