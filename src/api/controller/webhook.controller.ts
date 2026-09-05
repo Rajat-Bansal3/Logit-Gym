@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { env } from "../../env";
 import { AppError } from "../../shared/errors/app-errors";
+import { appLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { GymService } from "../services/gym.service";
 
@@ -13,6 +14,14 @@ export class WebhookController {
 
 	handleRazorpay = async (req: Request, res: Response, next: NextFunction) => {
 		try {
+			appLogger.error("razorPay webhook hit", {
+				body: req.body,
+				headers: req.headers,
+			});
+			console.log("razorPay webhook hit", {
+				body: req.body,
+				headers: req.headers,
+			});
 			const signature = req.headers["x-razorpay-signature"] as string;
 			const isValid = this.verifyRazorpayWebhook(req.body, signature);
 			if (!isValid) {

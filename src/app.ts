@@ -25,14 +25,20 @@ export const createApp = () => {
 	);
 	app.use("/uploads", express.static(path.join(process.cwd(), "/uploads")));
 
+	const webhookController = new WebhookController();
+
+	app.post(
+		"/webhook/v1/razorpay",
+		express.raw({ type: "application/json" }),
+		webhookController.handleRazorpay,
+	);
 	app.use(express.json({ limit: "10mb" }));
+
 	app.use(express.urlencoded({ extended: true, limit: "2mb", parameterLimit: 5000 }));
 
 	// app.use(requestIdMiddleware);
 	// app.use(httpLogger);
 	// app.use(requestLogger);
-
-	const webhookController = new WebhookController();
 
 	app.get("/api/v1/health", (req, res) => {
 		const logger = appLogger.withRequest(req);
@@ -49,11 +55,6 @@ export const createApp = () => {
 	app.use("/api/v1/gym", require("./api/routes/v1/gym.routes").default);
 	app.use("/api/v1/payments", require("./api/routes/v1/payment.routes").default);
 	app.use("/api/v1/member", require("./api/routes/v1/member-side.routes").default);
-	app.post(
-		"/webhook/v1/razorpay",
-		express.raw({ type: "application/json" }),
-		webhookController.handleRazorpay,
-	);
 
 	app.use(notFoundHandler);
 	app.use(errorHandler);
