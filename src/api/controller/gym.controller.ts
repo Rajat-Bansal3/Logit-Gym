@@ -217,6 +217,7 @@ export class GymController {
 			const subscription = await this.gymService.createGymSubscription(data, user.gymId);
 			return res.status(200).json(subscription);
 		} catch (error) {
+			this.logger.error("create sub", error);
 			next(error);
 			return;
 		}

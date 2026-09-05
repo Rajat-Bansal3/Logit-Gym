@@ -80,7 +80,7 @@ export class PlanRepository {
 				data: {
 					gymId,
 					planId,
-					status: plan.billingCycle === "TRIAL" ? "TRIALING" : "ACTIVE",
+					status: plan.billingCycle === "TRIAL" ? "TRIALING" : "PENDING",
 					currentPeriodStart,
 					currentPeriodEnd,
 					cancelAtPeriodEnd: false,
@@ -92,7 +92,7 @@ export class PlanRepository {
 				where: { id: gymId },
 				data: {
 					currentSubscriptionId: sub.id,
-					subscriptionStatus: plan.billingCycle === "TRIAL" ? "TRIALING" : "ACTIVE",
+					subscriptionStatus: plan.billingCycle === "TRIAL" ? "TRIALING" : "PENDING",
 				},
 			});
 
@@ -105,7 +105,7 @@ export class PlanRepository {
 		return this.prisma.subscription.findFirst({
 			where: {
 				gymId,
-				status: { in: ["ACTIVE", "TRIALING"] },
+				status: { in: ["ACTIVE"] },
 			},
 		});
 	};
