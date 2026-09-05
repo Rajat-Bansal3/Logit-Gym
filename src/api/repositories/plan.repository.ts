@@ -34,7 +34,16 @@ export class PlanRepository {
 		});
 	};
 	getPlans = async (): Promise<Plan[]> => {
-		return await this.prisma.plan.findMany();
+		return await this.prisma.plan.findMany({
+			where: {
+				isActive: true,
+				name: {
+					not: {
+						equals: "TRIAL",
+					},
+				},
+			},
+		});
 	};
 	getSubscription = async (gymId: string): Promise<gym_with_sub> => {
 		const gym_with_sub = await this.prisma.gym.findUnique({
