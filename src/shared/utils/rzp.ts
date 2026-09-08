@@ -31,7 +31,7 @@ export async function createRZPPlan(plan: {
 export async function createRZPSubscription(planId: string, gymId: string) {
 	const rzpSub = await razorpay.subscriptions.create({
 		plan_id: planId,
-		total_count: 120,
+		total_count: 3,
 		notes: {
 			gymId: gymId,
 		},
