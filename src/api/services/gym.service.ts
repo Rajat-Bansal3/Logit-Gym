@@ -401,6 +401,7 @@ export class GymService {
 			currentPeriodStart: new Date(subscription.current_start * 1000),
 			currentPeriodEnd: new Date(subscription.current_end * 1000),
 			gracePeriodEnd: null,
+			renue_status: "ACTIVE",
 		});
 	};
 
@@ -424,20 +425,23 @@ export class GymService {
 
 	private handleSubscriptionHalted = async (subscription: any): Promise<void> => {
 		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
-			status: "EXPIRED",
+			status: "ACTIVE",
+			renue_status: "CANCELLED",
 			gracePeriodEnd: new Date(Date.now() + 5 * 86_400_000),
 		});
 	};
 
 	private handleSubscriptionCancelled = async (subscription: any): Promise<void> => {
 		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
-			status: "CANCELLED",
+			status: "ACTIVE",
+			renue_status: "CANCELLED",
 		});
 	};
 
 	private handleSubscriptionPending = async (subscription: any): Promise<void> => {
 		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
-			status: "EXPIRED",
+			status: "PENDING",
+			renue_status: "PENDING",
 		});
 	};
 

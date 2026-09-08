@@ -463,12 +463,13 @@ model Plan {
 }
 
 model Subscription {
-  id     String             @id @default(cuid())
-  gymId  String
-  gym    Gym                @relation("GymSubscriptions", fields: [gymId], references: [id], onDelete: Restrict)
-  planId String
-  plan   Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
-  status SubscriptionStatus @default(TRIALING)
+  id           String             @id @default(cuid())
+  gymId        String
+  gym          Gym                @relation("GymSubscriptions", fields: [gymId], references: [id], onDelete: Restrict)
+  planId       String
+  plan         Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status       SubscriptionStatus @default(TRIALING)
+  renue_status SubscriptionStatus @default(TRIALING)
 
   currentPeriodStart DateTime
   currentPeriodEnd   DateTime

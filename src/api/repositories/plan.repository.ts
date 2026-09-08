@@ -118,6 +118,7 @@ export class PlanRepository {
 			currentPeriodStart: Date;
 			currentPeriodEnd: Date;
 			gracePeriodEnd: Date | null;
+			renue_status: SubscriptionStatus;
 		}>,
 	) => {
 		return this.prisma.$transaction(async (tx) => {
