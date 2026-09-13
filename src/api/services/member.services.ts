@@ -4,6 +4,7 @@ import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import type { AuthenticatedUser, ChangePasswordMember } from "../../shared/types/auth.types";
 import type { bulkAddMembers, ValidMember } from "../../shared/types/gym.types";
+import type { MachineData } from "../../shared/types/machine.types";
 import {
 	type ListMembersQuery,
 	type MarkAttendance,
@@ -76,12 +77,17 @@ export class MemberService {
 		if (!membershipCode) {
 			throw new MemberError(MemberErrorCode.BAD_REQUEST, "membership code not provided");
 		}
+		const membershipPackage = await this.gymRepository.getMembershipPackage(gymId, data.packageId);
+		if (!membershipPackage) {
+			throw new MemberError(MemberErrorCode.BAD_REQUEST, "Plan with planId doesnt exists");
+		}
 		await this.gymRepository.update(gymId, {}, gym.settings?.biometricPreference === "AUTO");
 		const member = await this.memberRepository.create(
 			gymId,
 			membershipCode,
 			data,
 			gym.owner.username,
+			membershipPackage,
 			image,
 		);
 
@@ -457,8 +463,7 @@ export class MemberService {
 		if (!dashboard?.currentMembership) {
 			throw new MemberError(MemberErrorCode.NOT_FOUND, "no dashboard with member found");
 		}
-		const plan_name =
-			dashboard.currentMembership.planName ?? dashboard.currentMembership.planType.toString();
+		const plan_name = dashboard.currentMembership.package.name;
 		const res: MemberDashboardOut = {
 			gymId: dashboard?.gymId,
 			memberId: dashboard?.id,
@@ -466,7 +471,7 @@ export class MemberService {
 			plan: plan_name,
 			days_left: dashboard.currentMembership.endDate,
 			activity_graph: dashboard.attendanceAggregate,
-			due_amount: dashboard.currentMembership.dueAmount,
+			due_amount: dashboard.currentMembership.package.amount,
 			metrics: dashboard.memberMetrics,
 		};
 		return {
@@ -503,9 +508,27 @@ export class MemberService {
 	}
 	async createMemberMembership(
 		memberId: string,
+		gymId: string,
 		data: CreateMemberMembershipInput,
 	): Promise<BaseResponse<null>> {
-		const membership = await this.memberRepository.createMemberMembership(memberId, data);
+		const membershipPackage = await this.gymRepository.getMembershipPackage(gymId, data.packageId);
+		if (!membershipPackage) {
+			throw new MemberError(MemberErrorCode.BAD_REQUEST, "package with package id not found");
+		}
+		const latest_membership = await this.memberRepository.getMembership(data.predecessor);
+		if (!latest_membership) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"no membership with provided predicessor id found",
+			);
+		}
+
+		const membership = await this.memberRepository.createMemberMembership(
+			memberId,
+			data,
+			membershipPackage,
+			latest_membership,
+		);
 		if (data.isMachine && data.serialNumber && membership.endDate) {
 			await this.machineRepository.setUserExpiration({
 				apiKey: env.MACHINE_SERVER_API_KEY,
@@ -519,6 +542,160 @@ export class MemberService {
 			success: true,
 		};
 	}
+	async deleteMemberMembership(
+		memberId: string,
+		membershipId: string,
+		data: MachineData,
+	): Promise<BaseResponse<null>> {
+		const membership = await this.memberRepository.getMembership(membershipId);
+		if (!membership) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"no membership with provided predicessor id found",
+			);
+		}
+		if (membership.successorId) {
+			return {
+				message: "membership has a successor delete successor first",
+				success: false,
+				data: null,
+			};
+		}
+		const endDate = await this.memberRepository.deleteMemberMembership(memberId, membershipId);
+		if (data.isMachine && data.serialNumber && endDate) {
+			await this.machineRepository.setUserExpiration({
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				biometricCode: membership.member.membershipCode,
+				expirationDate: endDate,
+				serialNumbers: data.serialNumber,
+			});
+		}
+		return {
+			message: "memberships deleted successfully",
+			success: true,
+		};
+	}
+	//   async bulkOnboardExcelMembers(
+	//     gymId: string,
+	//     members: bulkAddMembers,
+	//     _user: AuthenticatedUser,
+	//   ): Promise<
+	//     BaseResponse<{
+	//       count: number;
+	//       failed: { row: number; reason: string }[];
+	//     }>
+	//   > {
+	//     this.logger.debug("bulkOnboardMembers: starting", {
+	//       gymId,
+	//       count: members.length,
+	//     });
+
+	//     const gym = await this.gymRepository.findById({ gymId, isDeleted: false });
+	//     if (!gym) {
+	//       throw new GymError(GymErrorCode.NOT_FOUND, "gym not found");
+	//     }
+
+	//     const phones: string[] = members
+	//       .filter((r): r is typeof r & { PhoneNumber: number } => !!r.PhoneNumber)
+	//       .map((r) => r.PhoneNumber.toString());
+	//     const emails: string[] = members
+	//       .filter((r): r is typeof r & { Email: string } => !!r.Email)
+	//       .map((r) => r.Email);
+
+	//     const [existingPhones, existingEmails] = await Promise.all([
+	//       this.memberRepository.findManyByPhones(phones, gym.id),
+	//       this.memberRepository.findManyByEmails(emails, gym.id),
+	//     ]);
+
+	//     const existingPhoneSet = new Set<string>(
+	//       existingPhones.map((m) => m.phone).filter((e): e is string => e !== null),
+	//     );
+	//     const existingEmailSet = new Set<string>(
+	//       existingEmails.map((m) => m.email).filter((e): e is string => e !== null),
+	//     );
+
+	//     const failed: { row: number; reason: string }[] = [];
+	//     const valid: ValidMember[] = [];
+
+	//     for (let i = 0; i < members.length; i++) {
+	//       const row = members[i];
+	//       if (!row) {
+	//         continue;
+	//       }
+
+	//       if (row.PhoneNumber && existingPhoneSet.has(row.PhoneNumber.toString())) {
+	//         failed.push({
+	//           row: i + 1,
+	//           reason: `Phone ${row.PhoneNumber} already exists`,
+	//         });
+	//         continue;
+	//       }
+
+	//       if (row.Email && existingEmailSet.has(row.Email)) {
+	//         failed.push({
+	//           row: i + 1,
+	//           reason: `Email ${row.Email} already exists`,
+	//         });
+	//         continue;
+	//       }
+
+	//       let membershipCode: number | undefined = row.EmployeeCode;
+
+	//       if (
+	//         gym.settings &&
+	//         gym.startingMembershipCode !== null &&
+	//         gym.settings.biometricPreference === "AUTO"
+	//       ) {
+	//         membershipCode =
+	//           gym.startingMembershipCode + gym.biometricCounter + valid.length;
+	//       }
+
+	//       if (membershipCode === undefined || membershipCode === null) {
+	//         failed.push({ row: i + 1, reason: "No membership code available" });
+	//         continue;
+	//       }
+
+	//       valid.push({
+	//         membershipCode,
+	//         data: {
+	//           name: row.EmployeeName,
+	//           gender: row.Gender,
+	//           phone: row.PhoneNumber.toString(),
+	//           emergencyContact: row.EmergencyContact?.toString(),
+	//           email: row.Email,
+	//           dateOfBirth: row.DOB,
+	//           weight: row.Weight,
+	//           height: row.Height,
+	//           planType: row.MembershipPlan,
+	//           membershipAmount: row.MembershipAmount,
+	//           membershipStartDate: row.StartDate,
+	//           dueAmount: 0,
+	//           isMachine: false,
+	//         },
+	//       });
+	//     }
+
+	//     await this.bulkRepository.BulkUploadMembersExcel(
+	//       gymId,
+	//       valid,
+	//       gym.owner.username,
+	//     );
+
+	//     if (gym.settings?.biometricPreference === "AUTO" && valid.length > 0) {
+	//       await this.gymRepository.update(
+	//         gymId,
+	//         { biometricCounter: valid.length },
+	//         false,
+	//       );
+	//     }
+
+	//     return {
+	//       message: "Bulk upload completed",
+	//       success: true,
+	//       data: { count: valid.length, failed },
+	//     };
+	//   }
+
 	async bulkOnboardExcelMembers(
 		gymId: string,
 		members: bulkAddMembers,
@@ -539,18 +716,25 @@ export class MemberService {
 			throw new GymError(GymErrorCode.NOT_FOUND, "gym not found");
 		}
 
-		const phones: string[] = members.map((r) => r.PhoneNumber.toString());
+		const phones: string[] = members
+			.filter((r): r is typeof r & { PhoneNumber: number } => !!r.PhoneNumber)
+			.map((r) => r.PhoneNumber.toString());
+
 		const emails: string[] = members
 			.filter((r): r is typeof r & { Email: string } => !!r.Email)
 			.map((r) => r.Email);
 
 		const [existingPhones, existingEmails] = await Promise.all([
-			this.memberRepository.findManyByPhones(phones, gym.id),
-			this.memberRepository.findManyByEmails(emails, gym.id),
+			phones.length > 0
+				? this.memberRepository.findManyByPhones(phones, gym.id)
+				: Promise.resolve([]),
+			emails.length > 0
+				? this.memberRepository.findManyByEmails(emails, gym.id)
+				: Promise.resolve([]),
 		]);
 
 		const existingPhoneSet = new Set<string>(
-			existingPhones.map((m) => m.phone).filter((e): e is string => e !== null),
+			existingPhones.map((m) => m.phone).filter((p): p is string => p !== null),
 		);
 		const existingEmailSet = new Set<string>(
 			existingEmails.map((m) => m.email).filter((e): e is string => e !== null),
@@ -565,7 +749,7 @@ export class MemberService {
 				continue;
 			}
 
-			if (existingPhoneSet.has(row.PhoneNumber.toString())) {
+			if (row.PhoneNumber && existingPhoneSet.has(row.PhoneNumber.toString())) {
 				failed.push({
 					row: i + 1,
 					reason: `Phone ${row.PhoneNumber} already exists`,
@@ -599,19 +783,17 @@ export class MemberService {
 			valid.push({
 				membershipCode,
 				data: {
-					name: row.EmployeeName,
-					gender: row.Gender,
-					phone: row.PhoneNumber.toString(),
-					emergencyContact: row.EmergencyContact?.toString(),
-					email: row.Email,
-					dateOfBirth: row.DOB,
-					weight: row.Weight,
-					height: row.Height,
-					planType: row.MembershipPlan,
-					membershipAmount: row.MembershipAmount,
-					membershipStartDate: row.StartDate,
-					dueAmount: 0,
-					isMachine: false,
+					EmployeeCode: row.EmployeeCode,
+					...(row.EmployeeName && { EmployeeName: row.EmployeeName }),
+					...(row.Gender && { Gender: row.Gender }),
+					...(row.PhoneNumber && { PhoneNumber: row.PhoneNumber }),
+					...(row.EmergencyContact && {
+						EmergencyContact: row.EmergencyContact,
+					}),
+					...(row.Email && { Email: row.Email }),
+					...(row.DOB && { DOB: row.DOB }),
+					...(row.Weight && { Weight: row.Weight }),
+					...(row.Height && { Height: row.Height }),
 				},
 			});
 		}
@@ -628,6 +810,7 @@ export class MemberService {
 			data: { count: valid.length, failed },
 		};
 	}
+
 	async bulkOnboardMachineMembers(
 		gymId: string,
 		serialNumber: string,

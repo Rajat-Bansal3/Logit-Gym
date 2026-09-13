@@ -44,13 +44,6 @@ enum CheckInType {
   OUT
 }
 
-enum MembershipPlanType {
-  MONTHLY
-  QUARTERLY
-  HALF_YEARLY
-  YEARLY
-}
-
 enum SubscriptionStatus {
   TRIALING
   ACTIVE
@@ -119,6 +112,7 @@ model Gym {
   hourlyTraffic    HourlyTraffic[]
   gymReports       GymReport[]
   machines         Machines[]
+  packages         Package[]
   gymMetrics       GymMetrics?
   settingsId       String
   settings         Settings         @relation(fields: [settingsId], references: [id])
@@ -198,6 +192,23 @@ model Member {
   @@map("members")
 }
 
+model Package {
+  id String @id @default(cuid())
+
+  name     String
+  amount   Int
+  entries  Int?
+  days     Int?
+  isActive Boolean @default(true)
+
+  gym         Gym?         @relation(fields: [gymId], references: [id])
+  gymId       String?
+  memberships Membership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model MemberMachine {
   memberId  String
   machineId String
@@ -217,14 +228,10 @@ model Membership {
 
   member Member @relation("MemberToHistory", fields: [memberId], references: [id], onDelete: Cascade)
 
-  planType  MembershipPlanType
   startDate DateTime
   endDate   DateTime?
-  isActive  Boolean            @default(true)
-
-  planName         String?
-  dueAmount        Float   @default(0)
-  membershipAmount Float   @default(0)
+  isActive  Boolean   @default(true)
+  isDeleted Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -232,6 +239,9 @@ model Membership {
   successorId String?     @unique
   successor   Membership? @relation("MembershipRenewal", fields: [successorId], references: [id])
   predecessor Membership? @relation("MembershipRenewal")
+
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id])
 
   payments Payment[]
 
@@ -513,7 +523,8 @@ model SubscriptionInvoice {
 model Settings {
   id String @id @default(cuid())
 
-  biometricPreference BioPref @default(AUTO)
+  biometricPreference   BioPref @default(AUTO)
+  createDefaultPackages Boolean @default(false)
 
   gyms Gym[]
 }

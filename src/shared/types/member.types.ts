@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MemberStatus, MembershipPlanType } from "../../generated/enums";
+import { MemberStatus } from "../../generated/enums";
 
 export const days = [
 	"sunday",
@@ -24,11 +24,8 @@ export const onboardMemberSchema = z.object({
 	weight: z.coerce.number().positive().optional(),
 	height: z.coerce.number().positive().optional(),
 
-	planType: z.enum(MembershipPlanType),
-	planName: z.string().optional(),
 	membershipStartDate: z.coerce.date(),
-	dueAmount: z.coerce.number().min(0).default(0),
-	membershipAmount: z.coerce.number().min(1).max(1_00_00_000),
+	packageId: z.string(),
 	isMachine: z.boolean().default(false),
 	serialNumbers: z.array(z.string()).optional(),
 	cardNumber: z.string().optional(),

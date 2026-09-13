@@ -1,6 +1,5 @@
 import z from "zod";
-import { BillingCycle, BioPref, MembershipPlanType } from "../../generated/enums";
-import type { OnboardMember } from "./member.types";
+import { BillingCycle, BioPref } from "../../generated/enums";
 
 const parseJson = <T extends z.ZodTypeAny>(schema: T) =>
 	z.preprocess((val) => {
@@ -97,6 +96,7 @@ export const createSubscriptionSchema = z.object({
 	// cancelAtPeriodEnd: z.boolean().default(false),
 });
 export const syncDataSchema = z.object({
+	gymId: z.string(),
 	date: z.string(),
 	serialNumber: z.array(z.string()),
 });
@@ -104,27 +104,20 @@ export const bulkAddSchema = z.object({
 	method: z.enum(["machineSync", "excel"]),
 	serialNumber: z.string().optional(),
 });
-export const bulkMembersSchema = z.array(
-	z.object({
-		EmployeeCode: z.number(),
-		EmployeeName: z.string(),
-		Gender: z.string(),
-		PhoneNumber: z.number(),
-		EmergencyContact: z.number(),
-		Email: z.email(),
-
-		DOB: z.coerce.date(),
-
-		Weight: z.number(),
-		Height: z.number(),
-
-		MembershipPlan: z.string().trim().pipe(z.enum(MembershipPlanType)),
-
-		MembershipAmount: z.number(),
-
-		StartDate: z.coerce.date(),
-	}),
-);
+export const bulkMember = z.object({
+	EmployeeCode: z.number(),
+	EmployeeName: z.string().optional(),
+	Gender: z.string().optional(),
+	PhoneNumber: z.number().optional(),
+	EmergencyContact: z.number().optional(),
+	Email: z.email().optional(),
+	DOB: z.coerce.date().optional(),
+	Weight: z.number().optional(),
+	Height: z.number().optional(),
+});
+export type bulkMemberType = z.infer<typeof bulkMember>;
+export const bulkMembersSchema = z.array(bulkMember);
+export type bulkMembersType = z.infer<typeof bulkMembersSchema>;
 export const createPlanSchema = z.object({
 	apiKey: z.string().min(10).max(20),
 	plan_name: z.string(),
@@ -132,12 +125,28 @@ export const createPlanSchema = z.object({
 	planAmount: z.number(),
 	interval: z.number(),
 });
+export const createMembershipPackageSchema = z.object({
+	name: z.string(),
+	amount: z.coerce.number().min(1),
+	entries: z.coerce.number().optional(),
+	days: z.coerce.number().optional(),
+});
+export const updateMembershipPackageSchema = z.object({
+	planId: z.string(),
+	name: z.string().optional(),
+	amount: z.coerce.number().optional(),
+	entries: z.coerce.number().optional(),
+	days: z.coerce.number().optional(),
+	isActive: z.coerce.boolean().optional(),
+});
+export type createMembershipPackageInput = z.infer<typeof createMembershipPackageSchema>;
+export type updateMembershipPackageInput = z.infer<typeof updateMembershipPackageSchema>;
 export type CreatePlanInput = z.infer<typeof createPlanSchema>;
 export type CreatePlanRepoInput = CreatePlanInput & { rzp_planID: string };
 
 export type ValidMember = {
 	membershipCode: number;
-	data: OnboardMember;
+	data: bulkMemberType;
 };
 export type UpdateGym = z.infer<typeof updateGymSchema>;
 export type CreateGym = z.infer<typeof createGymSchema>;

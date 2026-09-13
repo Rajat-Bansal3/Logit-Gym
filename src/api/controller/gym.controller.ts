@@ -6,11 +6,13 @@ import {
 	bulkAddSchema,
 	bulkMembersSchema,
 	createGymSchema,
+	createMembershipPackageSchema,
 	createPlanSchema,
 	createSubscriptionSchema,
 	getPresignedUrlsSchema,
 	syncDataSchema,
 	updateGymSchema,
+	updateMembershipPackageSchema,
 } from "../../shared/types/gym.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
@@ -225,11 +227,7 @@ export class GymController {
 	syncAttendance = async (req: Request, res: Response, next: NextFunction) => {
 		try {
 			const data = syncDataSchema.parse(req.body);
-			const user = req.user;
-			if (!user?.gymId) {
-				throw new GymError(GymErrorCode.UNAUTHORIZED, "gym id not found");
-			}
-			const ok = await this.gymService.syncAttendance(data, user.gymId);
+			const ok = await this.gymService.syncAttendance(data);
 			res.status(200).json(ok);
 		} catch (error) {
 			next(error);
@@ -239,7 +237,6 @@ export class GymController {
 		try {
 			const data = bulkAddSchema.parse(req.body);
 			const user = req.user;
-			console.log(user);
 			if (!user?.gymId) {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "gym id not found");
 			}
@@ -297,6 +294,61 @@ export class GymController {
 			return res.status(200).json({});
 		} catch (error) {
 			next(error);
+			return;
+		}
+	};
+	getMembershipPackages = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
+			}
+			const membershipPackages = this.gymService.getMembershipPackages(user.gymId);
+			return res.status(200).json(membershipPackages);
+		} catch (err) {
+			next(err);
+			return;
+		}
+	};
+	createMembershipPackages = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
+			}
+			const data = createMembershipPackageSchema.parse(req.body);
+			const membershipPackages = this.gymService.createMembershipPackages(user.gymId, data);
+			return res.status(200).json(membershipPackages);
+		} catch (err) {
+			next(err);
+			return;
+		}
+	};
+	updateMembershipPackages = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
+			}
+			const data = updateMembershipPackageSchema.parse(req.body);
+			const membershipPackages = this.gymService.updateMembershipPackages(user.gymId, data);
+			return res.status(200).json(membershipPackages);
+		} catch (err) {
+			next(err);
+			return;
+		}
+	};
+	deleteMembershipPackages = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			const gymId = req.params.id;
+			if (!user || !gymId || Array.isArray(gymId) || user.gymId || user.gymId !== gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
+			}
+			const membershipPackages = this.gymService.getMembershipPackages(gymId);
+			return res.status(200).json(membershipPackages);
+		} catch (err) {
+			next(err);
 			return;
 		}
 	};

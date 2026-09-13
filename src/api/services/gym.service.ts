@@ -2,7 +2,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 import { env } from "../../env";
-import type { CheckInType, Plan, PrismaClient } from "../../generated/client";
+import type { CheckInType, Package, Plan, PrismaClient } from "../../generated/client";
 import { AppError } from "../../shared/errors/app-errors";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import type { AuthenticatedUser } from "../../shared/types/auth.types";
@@ -11,8 +11,10 @@ import type {
 	CreateGym,
 	CreatePlanInput,
 	CreateSubscription,
+	createMembershipPackageInput,
 	SyncData,
 	UpdateGym,
+	updateMembershipPackageInput,
 } from "../../shared/types/gym.types";
 import type { BaseResponse } from "../../shared/types/returns";
 import { AppLogger } from "../../shared/utils/logger";
@@ -323,7 +325,7 @@ export class GymService {
 				break;
 		}
 	};
-	syncAttendance = async (syncData: SyncData, gymId: string): Promise<BaseResponse<number>> => {
+	syncAttendance = async (syncData: SyncData): Promise<BaseResponse<number>> => {
 		const logs = await this.machineRepository.getDeviceLogs(
 			syncData.serialNumber,
 			env.MACHINE_SERVER_API_KEY,
@@ -331,7 +333,7 @@ export class GymService {
 		);
 		const members = await this.memberRepository.getMembers(
 			logs.map((log) => log.memberCode),
-			gymId,
+			syncData.gymId,
 		);
 		const memberMap = new Map(members.map((member) => [member.membershipCode, member.id]));
 
@@ -345,7 +347,7 @@ export class GymService {
 					memberId: memberId,
 					membershipCode: log.memberCode,
 					timestamp: this.utcDate(log.logDate),
-					gymId: gymId,
+					gymId: syncData.gymId,
 					type: "IN" as CheckInType,
 				};
 			})
@@ -389,6 +391,44 @@ export class GymService {
 			data: { name: repoPlan.name, active: repoPlan.isActive },
 		};
 	};
+
+	getMembershipPackages = async (gymId: string): Promise<BaseResponse<Package[]>> => {
+		const packages = await this.gymRepository.getMembershipPackages(gymId);
+		return {
+			message: "packages fetched successfully",
+			success: true,
+			data: packages,
+		};
+	};
+	createMembershipPackages = async (
+		gymId: string,
+		data: createMembershipPackageInput,
+	): Promise<BaseResponse<null>> => {
+		if (data.entries === undefined && data.days === undefined) {
+			throw new GymError(
+				GymErrorCode.BAD_REQUEST,
+				"At least one of 'entries' or 'days' must be provided.",
+			);
+		}
+		await this.gymRepository.createMembershipPackages(gymId, data);
+		return {
+			message: "packages created successfully",
+			success: true,
+			data: null,
+		};
+	};
+	updateMembershipPackages = async (
+		gymId: string,
+		data: updateMembershipPackageInput,
+	): Promise<BaseResponse<null>> => {
+		await this.gymRepository.updateMembershipPackages(gymId, data);
+		return {
+			message: "packages fetched successfully",
+			success: true,
+			data: null,
+		};
+	};
+
 	private utcDate(deviceTime: string) {
 		return new Date(new Date(`${deviceTime.replace(" ", "T")}+05:30`).toISOString());
 	}

@@ -19,6 +19,8 @@ const router = Router();
 const gymController = new GymController();
 router.get("/create-plan", gymController.createPlan);
 
+//cron - sync data
+router.post("/sync-attendances", catchAsync(gymController.syncAttendance));
 router.use(authMiddleware);
 router.use("/:gymId/members", memberRouter);
 /**
@@ -37,7 +39,6 @@ router.post("/subscription", roleMiddleware("OWNER"), gymController.createSubscr
  * Get gym details
  */
 router.get("/:id", roleMiddleware("OWNER"), catchAsync(gymController.getGym));
-
 /**
  * Update gym information
  */
@@ -46,6 +47,18 @@ router.patch(
 	roleMiddleware("OWNER"),
 	uploadMultipleImage("gymImages", 5),
 	catchAsync(gymController.updateGym),
+);
+
+router.get("/membership-plans", roleMiddleware("OWNER"), gymController.getMembershipPackages);
+router.post(
+	"/create-membership-plans",
+	roleMiddleware("OWNER"),
+	gymController.createMembershipPackages,
+);
+router.put(
+	"/update-membership-plans",
+	roleMiddleware("OWNER"),
+	gymController.updateMembershipPackages,
 );
 
 router.delete("/delete-machine", roleMiddleware("OWNER"), catchAsync(gymController.removeMachine));
@@ -64,7 +77,7 @@ router.post(
 	roleMiddleware("OWNER"),
 	catchAsync(gymController.getPresignedUrls),
 );
-router.post("/sync-attendances", roleMiddleware("OWNER"), catchAsync(gymController.syncAttendance));
+
 router.post(
 	"/bulk-add-members",
 	roleMiddleware("OWNER"),

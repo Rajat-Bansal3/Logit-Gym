@@ -1,7 +1,13 @@
-import type { Gym, Prisma, PrismaClient } from "../../generated/client";
+import type { Gym, Package, Prisma, PrismaClient } from "../../generated/client";
 import type { BioPref } from "../../generated/enums";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
-import type { CreateGym, CreatePlanRepoInput, UpdateGym } from "../../shared/types/gym.types";
+import type {
+	CreateGym,
+	CreatePlanRepoInput,
+	createMembershipPackageInput,
+	UpdateGym,
+	updateMembershipPackageInput,
+} from "../../shared/types/gym.types";
 import { computePeriodEnd } from "../../shared/utils/util_functions";
 
 type gym_including_owner = Prisma.GymGetPayload<{
@@ -304,6 +310,50 @@ export class GymRepository {
 				name: planData.plan_name,
 				price: planData.planAmount,
 				razorpayId: planData.rzp_planID,
+			},
+		});
+	};
+	getMembershipPackages = async (gymId: string): Promise<Package[]> => {
+		return await this.client.package.findMany({
+			where: {
+				gymId: gymId,
+			},
+			orderBy: {
+				amount: "asc",
+			},
+		});
+	};
+	getMembershipPackage = async (gymId: string, packageId: string): Promise<Package | null> => {
+		return await this.client.package.findUnique({
+			where: {
+				gymId: gymId,
+				id: packageId,
+			},
+		});
+	};
+	createMembershipPackages = async (gymId: string, data: createMembershipPackageInput) => {
+		await this.client.package.create({
+			data: {
+				amount: data.amount,
+				...(data.days && { days: data.days }),
+				...(data.entries && { entries: data.entries }),
+				name: data.name,
+				gymId: gymId,
+			},
+		});
+	};
+	updateMembershipPackages = async (gymId: string, data: updateMembershipPackageInput) => {
+		await this.client.package.update({
+			where: {
+				gymId: gymId,
+				id: data.planId,
+			},
+			data: {
+				...(data.name && { name: data.name }),
+				...(data.amount && { amount: data.amount }),
+				...(data.days && { days: data.days }),
+				...(data.entries && { entries: data.entries }),
+				...(data.isActive && { isActive: data.isActive }),
 			},
 		});
 	};

@@ -482,7 +482,11 @@ export class MemberController {
 			if (!user?.gymId || !memberId || Array.isArray(memberId)) {
 				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
 			}
-			const membership = await this.memberService.createMemberMembership(memberId, data);
+			const membership = await this.memberService.createMemberMembership(
+				memberId,
+				user.gymId,
+				data,
+			);
 			res.status(200).json(membership);
 		} catch (error) {
 			this.logger.error("getMemberMembership req errored", error);

@@ -5,6 +5,7 @@ import {
 	type MemberMetrics,
 	type MemberStatus,
 	type Membership,
+	type Package,
 	type Payment,
 	type Prisma,
 	type PrismaClient,
@@ -103,7 +104,11 @@ export type MemberDashboardData = Prisma.MemberGetPayload<{
 			};
 		};
 		memberMetrics: true;
-		currentMembership: true;
+		currentMembership: {
+			include: {
+				package: true;
+			};
+		};
 		user: true;
 	};
 }>;
@@ -257,9 +262,13 @@ export class MemberRepository {
 		lastCode: number,
 		input: OnboardMember,
 		gym_username: string,
+		membershipPackage: Package,
 		image?: string,
 	): Promise<MemberWithDetails> {
-		const endDate = computeMembershipEndDate(input.membershipStartDate, input.planType);
+		const endDate = computeMembershipEndDate(
+			input.membershipStartDate,
+			membershipPackage.days ?? 730,
+		);
 
 		return this.prisma.$transaction(
 			async (tx) => {
@@ -319,41 +328,36 @@ export class MemberRepository {
 				const membership = await tx.membership.create({
 					data: {
 						memberId: member.id,
-						planType: input.planType,
 						startDate: input.membershipStartDate,
 						endDate,
-						dueAmount: input.dueAmount,
 						isActive: true,
-						...(input.planName !== undefined && { planName: input.planName }),
-						membershipAmount: input.membershipAmount,
+						packageId: membershipPackage.id,
 					},
 				});
-				if (input.dueAmount === 0) {
-					await tx.payment.create({
-						data: {
-							amount: input.membershipAmount,
-							gymId,
-							memberId: member.id,
-							membershipId: membership.id,
-							category: "Membership",
-							paidDate: new Date(),
-							type: "CREDIT",
+				await tx.payment.create({
+					data: {
+						amount: membershipPackage.amount,
+						gymId,
+						memberId: member.id,
+						membershipId: membership.id,
+						category: "Membership",
+						paidDate: new Date(),
+						type: "CREDIT",
+					},
+				});
+				await tx.gymMetrics.update({
+					where: {
+						gymId,
+					},
+					data: {
+						totalRevenue: {
+							increment: membershipPackage.amount,
 						},
-					});
-					await tx.gymMetrics.update({
-						where: {
-							gymId,
-						},
-						data: {
-							totalRevenue: {
-								increment: input.membershipAmount,
-							},
-						},
-					});
-					await tx.memberMetrics.create({
-						data: { memberId: member.id, paymentStatus: "PAID" },
-					});
-				}
+					},
+				});
+				await tx.memberMetrics.create({
+					data: { memberId: member.id, paymentStatus: "PAID" },
+				});
 
 				const updated = await tx.member.update({
 					where: { id: member.id },
@@ -564,7 +568,13 @@ export class MemberRepository {
 					currentMembership: {
 						select: {
 							endDate: true,
-							membershipAmount: true,
+						},
+						include: {
+							package: {
+								select: {
+									amount: true,
+								},
+							},
 						},
 					},
 				},
@@ -605,7 +615,7 @@ export class MemberRepository {
 			}
 			const currDate = new Date();
 			const fiveDaysBeforeEnd = new Date(currMemEndDate.getTime() - 5 * 24 * 60 * 60 * 1000);
-			const amount = member.currentMembership?.membershipAmount || 0;
+			const amount = member.currentMembership?.package.amount || 0;
 			if (currDate > currMemEndDate) {
 				memberMap.expired.count++;
 				memberMap.expired.dueAmount += amount;
@@ -847,7 +857,11 @@ export class MemberRepository {
 			},
 			include: {
 				user: true,
-				currentMembership: true,
+				currentMembership: {
+					include: {
+						package: true,
+					},
+				},
 				gym: {
 					include: {
 						gymProfile: true,
@@ -926,17 +940,34 @@ export class MemberRepository {
 			},
 		});
 	}
-	async createMemberMembership(memberId: string, data: CreateMemberMembershipInput) {
-		const curr_membership = await this.prisma.$transaction(
+	async getMembership(membershipId: string) {
+		return await this.prisma.membership.findUnique({
+			where: {
+				id: membershipId,
+			},
+			include: {
+				member: {
+					select: {
+						membershipCode: true,
+					},
+				},
+			},
+		});
+	}
+	async createMemberMembership(
+		memberId: string,
+		data: CreateMemberMembershipInput,
+		membershipPackage: Package,
+		currentMembership?: Membership,
+	) {
+		const newMembership = await this.prisma.$transaction(
 			async (tx) => {
-				const curr_membership = await tx.membership.create({
+				const newMembership = await tx.membership.create({
 					data: {
 						memberId: memberId,
-						planType: data.planType,
 						startDate: data.startDate,
-						dueAmount: data.dueAmount,
-						endDate: computeMembershipEndDate(data.startDate, data.planType),
-						membershipAmount: data.membershipAmount,
+						endDate: computeMembershipEndDate(data.startDate, membershipPackage.days ?? 730),
+						packageId: data.packageId,
 					},
 					select: {
 						id: true,
@@ -949,32 +980,69 @@ export class MemberRepository {
 						},
 					},
 				});
-				await tx.membership.update({
-					where: {
-						id: data.predecessor,
-					},
-					data: {
-						successorId: curr_membership.id,
-					},
-				});
+				if (currentMembership) {
+					await tx.membership.update({
+						where: {
+							id: currentMembership.id,
+						},
+						data: {
+							successorId: newMembership.id,
+						},
+					});
+				}
+				if (currentMembership?.endDate && currentMembership.endDate > new Date()) {
+					await tx.member.update({
+						where: {
+							id: memberId,
+						},
+						data: {
+							currentMembershipId: newMembership.id,
+						},
+					});
+				}
+
 				await tx.payment.create({
 					data: {
-						amount: data.membershipAmount,
+						amount: membershipPackage.amount,
 						description: "membership payment",
 						memberId: memberId,
-						membershipId: curr_membership.id,
-						gymId: curr_membership.member.gymId,
+						membershipId: newMembership.id,
+						gymId: newMembership.member.gymId,
 						type: "CREDIT",
 						category: "Membership",
 					},
 				});
-				return curr_membership;
+				return newMembership;
 			},
 			{
 				timeout: 25000,
 			},
 		);
-		return curr_membership;
+		return newMembership;
+	}
+	async deleteMemberMembership(memberId: string, membershipId: string) {
+		await this.prisma.membership.update({
+			where: {
+				id: membershipId,
+			},
+			data: {
+				isDeleted: true,
+			},
+		});
+		const endDate = await this.prisma.membership.findMany({
+			where: {
+				memberId,
+				isDeleted: false,
+			},
+			orderBy: {
+				endDate: "desc",
+			},
+			take: 1,
+			select: {
+				endDate: true,
+			},
+		});
+		return endDate[0]?.endDate;
 	}
 	async createMemberMachines(machineId: string[], memberId: string) {
 		return await Promise.all(
