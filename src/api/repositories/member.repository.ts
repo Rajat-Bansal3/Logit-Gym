@@ -247,7 +247,7 @@ export class MemberRepository {
 			...(category === "deleted" ? { isDeleted: true } : { isDeleted: false }),
 		};
 
-		const [members, total] = await this.prisma.$transaction([
+		const [members, total] = await Promise.all([
 			this.prisma.member.findMany({
 				where,
 				skip,
@@ -572,8 +572,6 @@ export class MemberRepository {
 					currentMembership: {
 						select: {
 							endDate: true,
-						},
-						include: {
 							package: {
 								select: {
 									amount: true,
