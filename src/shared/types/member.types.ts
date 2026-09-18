@@ -12,7 +12,7 @@ export const days = [
 ] as const;
 export const onboardMemberSchema = z.object({
 	name: z.string().min(1),
-	dateOfBirth: z.coerce.date(),
+	dateOfBirth: z.coerce.date().optional(),
 	address: z.string().optional(),
 	phone: z.string().min(1),
 	email: z.string().optional(),

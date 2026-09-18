@@ -24,7 +24,7 @@ import { computeAge, computeMembershipEndDate } from "../../shared/utils/util_fu
 import { AuthService } from "../services/auth.service";
 
 export type MemberWithDetails = Member & {
-	currentMembership: Membership | null;
+	currentMembership: (Membership & { package: Package }) | null;
 	memberMetrics: MemberMetrics | null;
 };
 
@@ -36,7 +36,11 @@ export type MemberListResult = {
 };
 
 const memberWithDetails = {
-	currentMembership: true,
+	currentMembership: {
+		include: {
+			package: true,
+		},
+	},
 	memberMetrics: true,
 	memberMachines: {
 		include: {
@@ -230,12 +234,12 @@ export class MemberRepository {
 			}),
 			...(isMachine === true &&
 				serialNumber !== undefined && {
-					memberMachines: {
-						some: {
-							machine: { serialNumber },
-						},
+				memberMachines: {
+					some: {
+						machine: { serialNumber },
 					},
-				}),
+				},
+			}),
 			...(membershipFilter && {
 				currentMembership: membershipFilter,
 			}),
@@ -280,21 +284,21 @@ export class MemberRepository {
 						gymId,
 						name: input.name,
 						username: username,
-						dateOfBirth: input.dateOfBirth,
 						...(input.address && { address: input.address }),
 						membershipCode: lastCode,
 						phone: input.phone,
 						gender: input.gender,
-						age: computeAge(input.dateOfBirth),
+						...(input.dateOfBirth !== undefined && {
+							dateOfBirth: input.dateOfBirth,
+							age: computeAge(input.dateOfBirth),
+						}),
 						...(input.email !== undefined && { email: input.email }),
 						...(input.emergencyContact !== undefined && {
 							emergencyContact: input.emergencyContact,
 						}),
 						...(input.weight !== undefined && { weight: input.weight }),
 						...(input.height !== undefined && { height: input.height }),
-						...(image !== undefined && {
-							avatarUrl: image,
-						}),
+						...(image !== undefined && { avatarUrl: image }),
 					},
 				});
 				await tx.user.create({

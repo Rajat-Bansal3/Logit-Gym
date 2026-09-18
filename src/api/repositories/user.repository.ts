@@ -26,28 +26,36 @@ export class UserRepository {
 		this.client = client;
 	}
 	getUserByUsername = async (username: string): Promise<UserEmailLookup | null> => {
-		console.log(username);
-		return this.client.user.findUnique({
-			where: {
-				username,
-			},
-			select: {
-				id: true,
-				role: true,
-				username: true,
-				password: true,
-				member: {
-					select: {
-						id: true,
+		console.log("LOGIN USERNAME:", username);
+
+		try {
+			return await this.client.user.findUnique({
+				where: {
+					username,
+				},
+				select: {
+					id: true,
+					role: true,
+					username: true,
+					password: true,
+					member: {
+						select: {
+							id: true,
+						},
+					},
+					gym: {
+						select: {
+							id: true,
+						},
 					},
 				},
-				gym: {
-					select: {
-						id: true,
-					},
-				},
-			},
-		});
+			});
+		} catch (error) {
+			console.error("===== PRISMA USER LOOKUP ERROR =====");
+			console.error(error);
+			console.error("=====================================");
+			throw error;
+		}
 	};
 	createUser = async (data: RegisterInput): Promise<UserEmailLookup> => {
 		return this.client.user.create({

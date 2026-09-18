@@ -353,7 +353,9 @@ export class GymRepository {
 				...(data.amount && { amount: data.amount }),
 				...(data.days && { days: data.days }),
 				...(data.entries && { entries: data.entries }),
-				...(data.isActive && { isActive: data.isActive }),
+				...(data.isActive !== undefined && {
+					isActive: data.isActive,
+				}),
 			},
 		});
 	};

@@ -303,7 +303,7 @@ export class GymController {
 			if (!user?.gymId) {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
-			const membershipPackages = this.gymService.getMembershipPackages(user.gymId);
+			const membershipPackages = await this.gymService.getMembershipPackages(user.gymId);
 			return res.status(200).json(membershipPackages);
 		} catch (err) {
 			next(err);
@@ -317,7 +317,7 @@ export class GymController {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
 			const data = createMembershipPackageSchema.parse(req.body);
-			const membershipPackages = this.gymService.createMembershipPackages(user.gymId, data);
+			const membershipPackages = await this.gymService.createMembershipPackages(user.gymId, data);
 			return res.status(200).json(membershipPackages);
 		} catch (err) {
 			next(err);
@@ -331,7 +331,7 @@ export class GymController {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
 			const data = updateMembershipPackageSchema.parse(req.body);
-			const membershipPackages = this.gymService.updateMembershipPackages(user.gymId, data);
+			const membershipPackages = await this.gymService.updateMembershipPackages(user.gymId, data);
 			return res.status(200).json(membershipPackages);
 		} catch (err) {
 			next(err);
@@ -345,7 +345,7 @@ export class GymController {
 			if (!user || !gymId || Array.isArray(gymId) || user.gymId || user.gymId !== gymId) {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
-			const membershipPackages = this.gymService.getMembershipPackages(gymId);
+			const membershipPackages = await this.gymService.getMembershipPackages(gymId);
 			return res.status(200).json(membershipPackages);
 		} catch (err) {
 			next(err);

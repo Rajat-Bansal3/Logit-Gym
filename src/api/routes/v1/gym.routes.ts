@@ -35,6 +35,8 @@ router.post(
 router.get("/subscription", roleMiddleware("OWNER"), gymController.getSub);
 router.get("/plans", roleMiddleware("OWNER"), gymController.getPlans);
 router.post("/subscription", roleMiddleware("OWNER"), gymController.createSubscription);
+
+router.get("/membership-plans", roleMiddleware("OWNER"), gymController.getMembershipPackages);
 /**
  * Get gym details
  */
@@ -49,7 +51,7 @@ router.patch(
 	catchAsync(gymController.updateGym),
 );
 
-router.get("/membership-plans", roleMiddleware("OWNER"), gymController.getMembershipPackages);
+
 router.post(
 	"/create-membership-plans",
 	roleMiddleware("OWNER"),

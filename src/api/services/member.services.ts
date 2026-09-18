@@ -62,7 +62,7 @@ export class MemberService {
 		if (!gym) {
 			throw new GymError(GymErrorCode.NOT_FOUND, "gym not found");
 		}
-		const existingPhone = await this.memberRepository.findByPhone(data.phone, gym.id);
+		const existingPhone = await this.memberRepository.findByPhone(data.phone!, gym.id);
 		if (existingPhone) {
 			throw new MemberError(
 				MemberErrorCode.CONFLICT,

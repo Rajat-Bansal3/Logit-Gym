@@ -7,6 +7,426 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id        String   @id @default(cuid())
+  email     String?
+  username  String   @unique
+  password  String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  gym       Gym[]
+  member    Member?
+
+  @@index([username])
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Gym {
+  id                     String             @id @default(cuid())
+  name                   String
+  address                String
+  hash                   String             @unique
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  isDeleted              Boolean            @default(false)
+  biometricCounter       Int                @default(0)
+  startingMembershipCode Int?
+  ownerId                String
+  subscriptionStatus     SubscriptionStatus @default(TRIALING)
+  currentSubscriptionId  String?            @unique
+  settingsId             String
+  packages               Package[]
+  attendanceLogs         AttendanceLog[]
+  gymMetrics             GymMetrics?
+  gymProfile             GymProfile?
+  gymReports             GymReport[]
+  currentSubscription    Subscription?      @relation("CurrentSubscription", fields: [currentSubscriptionId], references: [id])
+  owner                  User               @relation(fields: [ownerId], references: [id])
+  settings               Settings           @relation(fields: [settingsId], references: [id])
+  hourlyTraffic          HourlyTraffic[]
+  machines               Machines[]
+  members                Member[]
+  payments               Payment[]
+  subscriptions          Subscription[]     @relation("GymSubscriptions")
+  transactions           Transaction[]
+  weeklyActivities       WeeklyActivity[]
+
+  @@unique([isDeleted, ownerId])
+  @@map("gyms")
+}
+
+model Machines {
+  id             String          @id @default(cuid())
+  name           String
+  serialNumber   String          @unique
+  gymId          String?
+  gym            Gym?            @relation(fields: [gymId], references: [id])
+  memberMachines MemberMachine[]
+
+  @@index([serialNumber])
+  @@index([name])
+  @@map("machines")
+}
+
+model Member {
+  id                  String           @id @default(cuid())
+  userId              String?          @unique
+  membershipCode      Int
+  gymId               String
+  name                String
+  username            String           @unique
+  dateOfBirth         DateTime?
+  address             String?
+  phone               String?
+  email               String?
+  avatarUrl           String?
+  gender              String?
+  emergencyContact    String?
+  weight              Float?
+  height              Float?
+  age                 Int?
+  status              MemberStatus     @default(ACTIVE)
+  isDeleted           Boolean          @default(false)
+  attendanceAggregate Int[]            @default([0, 0, 0, 0, 0, 0, 0])
+  joinDate            DateTime         @default(now())
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  currentMembershipId String?          @unique
+  attendanceLogs      AttendanceLog[]
+  memberMachines      MemberMachine[]
+  memberMetrics       MemberMetrics?
+  currentMembership   Membership?      @relation("CurrentMemberPlan", fields: [currentMembershipId], references: [id])
+  gym                 Gym              @relation(fields: [gymId], references: [id])
+  user                User?            @relation(fields: [userId], references: [id])
+  membershipHistory   Membership[]     @relation("MemberToHistory")
+  payments            Payment[]
+  transactions        Transaction[]
+  weeklyActivities    WeeklyActivity[]
+
+  @@unique([gymId, membershipCode])
+  @@unique([gymId, phone])
+  @@unique([gymId, email])
+  @@index([gymId])
+  @@index([status])
+  @@index([joinDate])
+  @@index([email])
+  @@index([phone])
+  @@map("members")
+}
+
+model Package {
+  id          String       @id @default(cuid())
+  name        String
+  amount      Int
+  entries     Int?
+  days        Int?
+  isActive    Boolean      @default(true)
+  gymId       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  gym         Gym?         @relation(fields: [gymId], references: [id])
+  memberships Membership[]
+}
+
+model MemberMachine {
+  memberId   String
+  machineId  String
+  assignedAt DateTime @default(now())
+  machine    Machines @relation(fields: [machineId], references: [id])
+  member     Member   @relation(fields: [memberId], references: [id])
+
+  @@id([memberId, machineId])
+  @@map("member_machines")
+}
+
+model Membership {
+  id               String      @id @default(cuid())
+  memberId         String
+  startDate        DateTime
+  endDate          DateTime?
+  isActive         Boolean     @default(true)
+  isDeleted        Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  successorId      String?     @unique
+  packageId        String
+  currentForMember Member?     @relation("CurrentMemberPlan")
+  member           Member      @relation("MemberToHistory", fields: [memberId], references: [id], onDelete: Cascade)
+  package          Package     @relation(fields: [packageId], references: [id])
+  successor        Membership? @relation("MembershipRenewal", fields: [successorId], references: [id])
+  predecessor      Membership? @relation("MembershipRenewal")
+  payments         Payment[]
+
+  @@unique([memberId, startDate])
+  @@index([memberId])
+  @@index([endDate])
+  @@index([isActive])
+  @@map("memberships")
+}
+
+model AttendanceLog {
+  id             String      @id @default(cuid())
+  membershipCode Int
+  memberId       String
+  gymId          String
+  type           CheckInType
+  timestamp      DateTime    @default(now())
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  gym            Gym         @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  member         Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipCode, gymId, timestamp])
+  @@index([memberId])
+  @@index([gymId])
+  @@index([timestamp])
+  @@index([memberId, timestamp])
+  @@map("attendance_logs")
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  memberId    String
+  gymId       String
+  amount      Float
+  date        DateTime        @default(now())
+  type        TransactionType
+  method      PaymentMethod
+  description String?
+  status      PaymentStatus   @default(SUCCESS)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  payment     Payment?
+  gym         Gym             @relation(fields: [gymId], references: [id])
+  member      Member          @relation(fields: [memberId], references: [id])
+
+  @@index([memberId])
+  @@index([gymId])
+  @@index([date])
+  @@index([type])
+  @@index([status])
+  @@map("transactions")
+}
+
+model Payment {
+  id            String          @id @default(cuid())
+  memberId      String?
+  membershipId  String?
+  gymId         String
+  amount        Float
+  dueDate       DateTime?
+  paidDate      DateTime?
+  description   String?
+  category      String
+  status        PaymentStatus   @default(SUCCESS)
+  type          TransactionType
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  transactionId String?         @unique
+  gym           Gym             @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  member        Member?         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  membership    Membership?     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  transaction   Transaction?    @relation(fields: [transactionId], references: [id])
+
+  @@index([memberId])
+  @@index([membershipId])
+  @@index([gymId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([paidDate])
+  @@map("payments")
+}
+
+model GymProfile {
+  id                String   @id @default(cuid())
+  gymId             String   @unique
+  bio               String?
+  timing            String
+  openDays          String[]
+  genderAllowed     String
+  instagram         String?
+  ownerName         String
+  ownerContact      String
+  fitnessProfession String?
+  rating            Float?   @default(0)
+  totalReviews      Int      @default(0)
+  images            String[]
+  amenities         String[]
+  referralOffer     String?
+  referralCode      String?  @unique
+  referralUsed      Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  gym               Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@index([gymId])
+  @@map("gym_profiles")
+}
+
+model WeeklyActivity {
+  id        String   @id @default(cuid())
+  memberId  String
+  gymId     String
+  weekStart DateTime
+  monday    Float    @default(0)
+  tuesday   Float    @default(0)
+  wednesday Float    @default(0)
+  thursday  Float    @default(0)
+  friday    Float    @default(0)
+  saturday  Float    @default(0)
+  sunday    Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, weekStart])
+  @@index([memberId])
+  @@index([gymId])
+  @@index([weekStart])
+  @@map("weekly_activities")
+}
+
+model HourlyTraffic {
+  id        String   @id @default(cuid())
+  gymId     String
+  date      DateTime
+  hour      Int
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@unique([gymId, date, hour])
+  @@index([gymId])
+  @@index([date, hour])
+  @@index([gymId, date])
+  @@map("hourly_traffic")
+}
+
+model GymReport {
+  id               String   @id @default(cuid())
+  gymId            String
+  reportDate       DateTime @default(now())
+  healthScore      Int
+  healthVerdict    String
+  monthlyRevenue   Float
+  projectedRevenue Float
+  activeMembers    Int
+  churnRiskCount   Int
+  aiInsights       String[]
+  weeklyData       Float[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  gym              Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@index([gymId])
+  @@index([reportDate])
+  @@index([gymId, reportDate])
+  @@map("gym_reports")
+}
+
+model GymMetrics {
+  id               String   @id @default(cuid())
+  gymId            String   @unique
+  currentOccupancy Int      @default(0)
+  totalRevenue     Float    @default(0)
+  pendingDues      Float    @default(0)
+  lastUpdated      DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  gym              Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@index([gymId])
+  @@map("gym_metrics")
+}
+
+model MemberMetrics {
+  id                   String        @id @default(cuid())
+  memberId             String        @unique
+  attendancePercentage Float         @default(0)
+  currentStreak        Int           @default(0)
+  lastCheckIn          DateTime?
+  totalCheckIns        Int           @default(0)
+  paymentStatus        PaymentStatus @default(PENDING)
+  lastUpdated          DateTime      @default(now())
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  member               Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([paymentStatus])
+  @@map("member_metrics")
+}
+
+model Plan {
+  id            String         @id @default(cuid())
+  name          String
+  price         Float
+  billingCycle  BillingCycle
+  razorpayId    String
+  aiReports     Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                    String                @id @default(cuid())
+  gymId                 String
+  planId                String
+  status                SubscriptionStatus    @default(TRIALING)
+  renue_status          SubscriptionStatus    @default(TRIALING)
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  trialEndsAt           DateTime?
+  gracePeriodEnd        DateTime?
+  cancelAtPeriodEnd     Boolean               @default(false)
+  gatewaySubscriptionId String?               @unique
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  currentForGym         Gym?                  @relation("CurrentSubscription")
+  invoices              SubscriptionInvoice[]
+  gym                   Gym                   @relation("GymSubscriptions", fields: [gymId], references: [id])
+  plan                  Plan                  @relation(fields: [planId], references: [id])
+
+  @@index([gymId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@map("subscriptions")
+}
+
+model SubscriptionInvoice {
+  id               String        @id @default(cuid())
+  subscriptionId   String
+  amount           Float
+  status           PaymentStatus @default(PENDING)
+  dueDate          DateTime
+  paidDate         DateTime?
+  gatewayInvoiceId String?       @unique
+  hostedInvoiceUrl String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("subscription_invoices")
+}
+
+model Settings {
+  id                  String  @id @default(cuid())
+  biometricPreference BioPref @default(AUTO)
+  gyms                Gym[]
+}
+
 enum UserRole {
   OWNER
   TRAINER
@@ -63,468 +483,4 @@ enum BillingCycle {
 enum BioPref {
   AUTO
   MANUAL
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String?
-  username  String   @unique
-  password  String
-  role      UserRole
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  member Member?
-  gym    Gym[]
-
-  @@index([username])
-  @@index([email])
-  @@index([role])
-  @@map("users")
-}
-
-model Gym {
-  id        String   @id @default(cuid())
-  name      String
-  address   String
-  hash      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDeleted Boolean  @default(false)
-
-  biometricCounter       Int  @default(0)
-  startingMembershipCode Int?
-
-  ownerId String
-  owner   User   @relation(fields: [ownerId], references: [id])
-
-  subscriptionStatus    SubscriptionStatus @default(TRIALING)
-  currentSubscriptionId String?            @unique
-  currentSubscription   Subscription?      @relation("CurrentSubscription", fields: [currentSubscriptionId], references: [id])
-  subscriptions         Subscription[]     @relation("GymSubscriptions")
-
-  gymProfile       GymProfile?
-  members          Member[]
-  attendanceLogs   AttendanceLog[]
-  transactions     Transaction[]
-  payments         Payment[]
-  weeklyActivities WeeklyActivity[]
-  hourlyTraffic    HourlyTraffic[]
-  gymReports       GymReport[]
-  machines         Machines[]
-  packages         Package[]
-  gymMetrics       GymMetrics?
-  settingsId       String
-  settings         Settings         @relation(fields: [settingsId], references: [id])
-
-  @@unique([isDeleted, ownerId])
-  @@map("gyms")
-}
-
-model Machines {
-  id           String @id @default(cuid())
-  name         String
-  serialNumber String @unique
-
-  gym   Gym?    @relation(fields: [gymId], references: [id])
-  gymId String?
-
-  memberMachines MemberMachine[]
-
-  @@index([serialNumber])
-  @@index([name])
-  @@map("machines")
-}
-
-model Member {
-  id     String  @id @default(cuid())
-  userId String? @unique
-
-  membershipCode Int
-
-  user User? @relation(fields: [userId], references: [id])
-
-  gymId String
-  gym   Gym    @relation(fields: [gymId], references: [id])
-
-  name        String
-  username    String    @unique
-  dateOfBirth DateTime?
-  address     String?
-  phone       String?
-  email       String?
-  avatarUrl   String?
-  gender      String?
-
-  emergencyContact String?
-
-  weight Float?
-  height Float?
-  age    Int?
-
-  status              MemberStatus @default(ACTIVE)
-  isDeleted           Boolean      @default(false)
-  attendanceAggregate Int[]        @default([0, 0, 0, 0, 0, 0, 0])
-  joinDate            DateTime     @default(now())
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-
-  membershipHistory Membership[] @relation("MemberToHistory")
-
-  currentMembershipId String?     @unique
-  currentMembership   Membership? @relation("CurrentMemberPlan", fields: [currentMembershipId], references: [id])
-
-  attendanceLogs   AttendanceLog[]
-  transactions     Transaction[]
-  payments         Payment[]
-  weeklyActivities WeeklyActivity[]
-  memberMetrics    MemberMetrics?
-  memberMachines   MemberMachine[]
-
-  @@unique([gymId, membershipCode])
-  @@unique([gymId, phone])
-  @@unique([gymId, email])
-  @@index([gymId])
-  @@index([status])
-  @@index([joinDate])
-  @@index([email])
-  @@index([phone])
-  @@map("members")
-}
-
-model Package {
-  id String @id @default(cuid())
-
-  name     String
-  amount   Int
-  entries  Int?
-  days     Int?
-  isActive Boolean @default(true)
-
-  gym         Gym?         @relation(fields: [gymId], references: [id])
-  gymId       String?
-  memberships Membership[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model MemberMachine {
-  memberId  String
-  machineId String
-
-  member  Member   @relation(fields: [memberId], references: [id])
-  machine Machines @relation(fields: [machineId], references: [id])
-
-  assignedAt DateTime @default(now())
-
-  @@id([memberId, machineId])
-  @@map("member_machines")
-}
-
-model Membership {
-  id       String @id @default(cuid())
-  memberId String
-
-  member Member @relation("MemberToHistory", fields: [memberId], references: [id], onDelete: Cascade)
-
-  startDate DateTime
-  endDate   DateTime?
-  isActive  Boolean   @default(true)
-  isDeleted Boolean   @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  successorId String?     @unique
-  successor   Membership? @relation("MembershipRenewal", fields: [successorId], references: [id])
-  predecessor Membership? @relation("MembershipRenewal")
-
-  packageId String
-  package   Package @relation(fields: [packageId], references: [id])
-
-  payments Payment[]
-
-  currentForMember Member? @relation("CurrentMemberPlan")
-
-  @@unique([memberId, startDate])
-  @@index([memberId])
-  @@index([endDate])
-  @@index([isActive])
-  @@map("memberships")
-}
-
-model AttendanceLog {
-  id             String      @id @default(cuid())
-  membershipCode Int
-  memberId       String
-  member         Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  gymId          String
-  gym            Gym         @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  type           CheckInType
-  timestamp      DateTime    @default(now())
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-
-  @@unique([membershipCode, gymId, timestamp])
-  @@index([memberId])
-  @@index([gymId])
-  @@index([timestamp])
-  @@index([memberId, timestamp])
-  @@map("attendance_logs")
-}
-
-model Transaction {
-  id          String          @id @default(cuid())
-  memberId    String
-  member      Member          @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  gymId       String
-  gym         Gym             @relation(fields: [gymId], references: [id], onDelete: Restrict)
-  amount      Float
-  date        DateTime        @default(now())
-  type        TransactionType
-  method      PaymentMethod
-  description String?
-  status      PaymentStatus   @default(SUCCESS)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-
-  payment Payment?
-
-  @@index([memberId])
-  @@index([gymId])
-  @@index([date])
-  @@index([type])
-  @@index([status])
-  @@map("transactions")
-}
-
-model Payment {
-  id           String          @id @default(cuid())
-  memberId     String?
-  member       Member?         @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  membershipId String?
-  membership   Membership?     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  gymId        String
-  gym          Gym             @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  amount       Float
-  dueDate      DateTime?
-  paidDate     DateTime?
-  description  String?
-  category     String
-  status       PaymentStatus   @default(SUCCESS)
-  type         TransactionType
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-
-  transactionId String?      @unique
-  transaction   Transaction? @relation(fields: [transactionId], references: [id])
-
-  @@index([memberId])
-  @@index([membershipId])
-  @@index([gymId])
-  @@index([status])
-  @@index([dueDate])
-  @@index([paidDate])
-  @@map("payments")
-}
-
-model GymProfile {
-  id    String @id @default(cuid())
-  gymId String @unique
-  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
-
-  bio           String?
-  timing        String
-  openDays      String[]
-  genderAllowed String
-  instagram     String?
-
-  ownerName         String
-  ownerContact      String
-  fitnessProfession String?
-
-  rating       Float?   @default(0)
-  totalReviews Int      @default(0)
-  images       String[]
-  amenities    String[]
-
-  referralOffer String?
-  referralCode  String? @unique
-  referralUsed  Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([gymId])
-  @@map("gym_profiles")
-}
-
-model WeeklyActivity {
-  id        String   @id @default(cuid())
-  memberId  String
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  gymId     String
-  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  weekStart DateTime
-  monday    Float    @default(0)
-  tuesday   Float    @default(0)
-  wednesday Float    @default(0)
-  thursday  Float    @default(0)
-  friday    Float    @default(0)
-  saturday  Float    @default(0)
-  sunday    Float    @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([memberId, weekStart])
-  @@index([memberId])
-  @@index([gymId])
-  @@index([weekStart])
-  @@map("weekly_activities")
-}
-
-model HourlyTraffic {
-  id        String   @id @default(cuid())
-  gymId     String
-  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  date      DateTime
-  hour      Int
-  count     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([gymId, date, hour])
-  @@index([gymId])
-  @@index([date, hour])
-  @@index([gymId, date])
-  @@map("hourly_traffic")
-}
-
-model GymReport {
-  id               String   @id @default(cuid())
-  gymId            String
-  gym              Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  reportDate       DateTime @default(now())
-  healthScore      Int
-  healthVerdict    String
-  monthlyRevenue   Float
-  projectedRevenue Float
-  activeMembers    Int
-  churnRiskCount   Int
-  aiInsights       String[]
-  weeklyData       Float[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([gymId])
-  @@index([reportDate])
-  @@index([gymId, reportDate])
-  @@map("gym_reports")
-}
-
-model GymMetrics {
-  id               String   @id @default(cuid())
-  gymId            String   @unique
-  gym              Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  currentOccupancy Int      @default(0)
-  totalRevenue     Float    @default(0)
-  pendingDues      Float    @default(0)
-  lastUpdated      DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([gymId])
-  @@map("gym_metrics")
-}
-
-model MemberMetrics {
-  id                   String        @id @default(cuid())
-  memberId             String        @unique
-  member               Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  attendancePercentage Float         @default(0)
-  currentStreak        Int           @default(0)
-  lastCheckIn          DateTime?
-  totalCheckIns        Int           @default(0)
-  paymentStatus        PaymentStatus @default(PENDING)
-  lastUpdated          DateTime      @default(now())
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-
-  @@index([memberId])
-  @@index([paymentStatus])
-  @@map("member_metrics")
-}
-
-model Plan {
-  id           String       @id @default(cuid())
-  name         String
-  price        Float
-  billingCycle BillingCycle
-  razorpayId   String
-  aiReports    Boolean      @default(false)
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-
-  subscriptions Subscription[]
-
-  @@map("plans")
-}
-
-model Subscription {
-  id           String             @id @default(cuid())
-  gymId        String
-  gym          Gym                @relation("GymSubscriptions", fields: [gymId], references: [id], onDelete: Restrict)
-  planId       String
-  plan         Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
-  status       SubscriptionStatus @default(TRIALING)
-  renue_status SubscriptionStatus @default(TRIALING)
-
-  currentPeriodStart DateTime
-  currentPeriodEnd   DateTime
-  trialEndsAt        DateTime?
-  gracePeriodEnd     DateTime?
-  cancelAtPeriodEnd  Boolean   @default(false)
-
-  gatewaySubscriptionId String? @unique
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  invoices      SubscriptionInvoice[]
-  currentForGym Gym?                  @relation("CurrentSubscription")
-
-  @@index([gymId])
-  @@index([status])
-  @@index([currentPeriodEnd])
-  @@map("subscriptions")
-}
-
-model SubscriptionInvoice {
-  id               String        @id @default(cuid())
-  subscriptionId   String
-  subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  amount           Float
-  status           PaymentStatus @default(PENDING)
-  dueDate          DateTime
-  paidDate         DateTime?
-  gatewayInvoiceId String?       @unique
-  hostedInvoiceUrl String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-
-  @@index([subscriptionId])
-  @@index([status])
-  @@index([dueDate])
-  @@map("subscription_invoices")
-}
-
-model Settings {
-  id String @id @default(cuid())
-
-  biometricPreference   BioPref @default(AUTO)
-  createDefaultPackages Boolean @default(false)
-
-  gyms Gym[]
 }
