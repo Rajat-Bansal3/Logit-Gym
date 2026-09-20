@@ -196,29 +196,37 @@ export class MemberRepository {
 		const tenDaysFromNow = new Date();
 		tenDaysFromNow.setDate(now.getDate() + 10);
 
-		let membershipFilter: Prisma.MembershipWhereInput | undefined;
+		// Bulk/machine-synced members can exist with no membership record at all
+		// (no package was ever assigned). They should still show up as "active"
+		// instead of silently disappearing from every category filter.
+		let membershipCondition: Prisma.MemberWhereInput | undefined;
 		switch (category) {
 			case "active":
-				membershipFilter = {
-					endDate: {
-						gt: tenDaysFromNow,
-					},
+				membershipCondition = {
+					OR: [
+						{ currentMembership: { endDate: { gt: tenDaysFromNow } } },
+						{ currentMembershipId: null },
+					],
 				};
 				break;
 
 			case "expiring":
-				membershipFilter = {
-					endDate: {
-						gte: now,
-						lte: tenDaysFromNow,
+				membershipCondition = {
+					currentMembership: {
+						endDate: {
+							gte: now,
+							lte: tenDaysFromNow,
+						},
 					},
 				};
 				break;
 
 			case "expired":
-				membershipFilter = {
-					endDate: {
-						lt: now,
+				membershipCondition = {
+					currentMembership: {
+						endDate: {
+							lt: now,
+						},
 					},
 				};
 				break;
@@ -227,30 +235,42 @@ export class MemberRepository {
 				break;
 		}
 
-		const where: Prisma.MemberWhereInput = {
-			gymId,
-			...(status !== undefined && { status }),
-			...(search !== undefined && {
+		const andConditions: Prisma.MemberWhereInput[] = [];
+
+		if (search !== undefined) {
+			andConditions.push({
 				OR: [
 					{ name: { contains: search, mode: "insensitive" } },
 					{ phone: { contains: search } },
 					{ username: { contains: search, mode: "insensitive" } },
 				],
-			}),
-			...(isMachine === true &&
-				serialNumber !== undefined && {
-				memberMachines: {
-					some: {
-						machine: { serialNumber },
-					},
-				},
-			}),
-			...(membershipFilter && {
-				currentMembership: membershipFilter,
+			});
+		}
+
+		if (membershipCondition) {
+			andConditions.push(membershipCondition);
+		}
+
+		const where: Prisma.MemberWhereInput = {
+			gymId,
+			...(status !== undefined && { status }),
+			...(isMachine === true && serialNumber !== undefined && {
+				memberMachines: { some: { machine: { serialNumber } } },
 			}),
 			...(category === "no-machine" && { memberMachines: { none: {} } }),
 			...(category === "deleted" ? { isDeleted: true } : { isDeleted: false }),
+			...(andConditions.length > 0 && { AND: andConditions }),
 		};
+
+		console.log("📋 MemberRepository.listByGym: query", {
+			gymId,
+			category,
+			status,
+			search,
+			isMachine,
+			serialNumber,
+			where: JSON.stringify(where),
+		});
 
 		const [members, total] = await Promise.all([
 			this.prisma.member.findMany({
@@ -262,6 +282,10 @@ export class MemberRepository {
 			}),
 			this.prisma.member.count({ where }),
 		]);
+
+		console.log(
+			`📋 MemberRepository.listByGym: found ${members.length}/${total} members for category="${category}"`,
+		);
 
 		return { members, total, page, limit };
 	}

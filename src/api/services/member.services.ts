@@ -800,6 +800,13 @@ export class MemberService {
 
 		await this.bulkRepository.BulkUploadMembersExcel(gymId, valid, gym.owner.username);
 
+		console.log(
+			`✅ bulkOnboardExcelMembers: inserted=${valid.length} failed=${failed.length} gymId=${gymId}`,
+		);
+		if (failed.length > 0) {
+			console.log("⚠️ bulkOnboardExcelMembers: failed rows", failed);
+		}
+
 		if (gym.settings?.biometricPreference === "AUTO" && valid.length > 0) {
 			await this.gymRepository.update(gymId, { biometricCounter: valid.length }, false);
 		}

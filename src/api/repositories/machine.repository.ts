@@ -9,7 +9,7 @@ export type LogType = {
 };
 
 export class MachineRepository {
-	constructor(private readonly prisma: PrismaClient) {}
+	constructor(private readonly prisma: PrismaClient) { }
 	async addMachine({
 		serialNumber,
 		machinename,

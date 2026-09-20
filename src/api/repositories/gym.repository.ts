@@ -72,7 +72,7 @@ export class GymRepository {
 				where: { isActive: true, name: "TRIAL" },
 			});
 			if (!plan) {
-				throw new GymError(GymErrorCode.NOT_FOUND, "no active triall found");
+				throw new GymError(GymErrorCode.NOT_FOUND, "no active trial found");
 			}
 
 			const curr = computePeriodEnd(new Date(), plan.billingCycle);

@@ -260,13 +260,44 @@ export class GymController {
 						throw new GymError(GymErrorCode.NOT_FOUND, "worksheet not found");
 					}
 
-					const members = xlsx.utils.sheet_to_json(worksheet);
-					const payload = bulkMembersSchema.parse(members);
+					const rawMembers = xlsx.utils.sheet_to_json(worksheet);
+					console.log(`📥 bulkAddMembers: read ${rawMembers.length} rows from sheet "${sheet}"`);
+
+					const parsedMembers = bulkMembersSchema.safeParse(rawMembers);
+
+					if (!parsedMembers.success) {
+						console.log("❌ bulkAddMembers: sheet validation failed", {
+							issues: parsedMembers.error.issues,
+						});
+
+						// issue.path looks like [rowIndex, fieldName] — turn that into
+						// something the gym owner can actually act on.
+						const friendlyIssues = parsedMembers.error.issues.map((issue) => {
+							const rowIndex = issue.path[0];
+							const field = issue.path[1] ?? "row";
+							const excelRow = typeof rowIndex === "number" ? rowIndex + 2 : "?";
+							return `Row ${excelRow}: ${String(field)} - ${issue.message}`;
+						});
+
+						const preview = friendlyIssues.slice(0, 5).join("; ");
+						const remaining = friendlyIssues.length - 5;
+
+						throw new GymError(
+							GymErrorCode.BAD_REQUEST,
+							`Some rows in the sheet are invalid. ${preview}${remaining > 0 ? `; and ${remaining} more issue(s)` : ""
+							}`,
+						);
+					}
+
+					const payload = parsedMembers.data;
+					console.log(`📥 bulkAddMembers: sheet parsed successfully, ${payload.length} valid rows`);
+
 					const report_excel_bulkOnboard = await this.memberService.bulkOnboardExcelMembers(
 						user.gymId,
 						payload,
 						user,
 					);
+					console.log("✅ bulkAddMembers: onboarding report", report_excel_bulkOnboard);
 					return res.status(200).json(report_excel_bulkOnboard);
 				}
 				/**
