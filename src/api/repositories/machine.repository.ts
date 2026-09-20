@@ -93,12 +93,12 @@ export class MachineRepository {
 					throw new MachineError(MachineErrorCode.API_UNREACHABLE);
 				}
 				if (error.response.status < 500) {
-					throw new MachineError(MachineErrorCode.API_REJECTED, JSON.stringify(error));
+					throw new MachineError(MachineErrorCode.API_REJECTED);
 				}
-				throw new MachineError(MachineErrorCode.API_SERVER_ERROR, JSON.stringify(error));
+				throw new MachineError(MachineErrorCode.API_SERVER_ERROR);
 			}
 
-			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR, JSON.stringify(error));
+			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
 		}
 	}
 
@@ -137,14 +137,14 @@ export class MachineRepository {
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
 				if (!error.response) {
-					throw new MachineError(MachineErrorCode.API_UNREACHABLE, JSON.stringify(error));
+					throw new MachineError(MachineErrorCode.API_UNREACHABLE);
 				}
 				if (error.response.status < 500) {
-					throw new MachineError(MachineErrorCode.API_REJECTED, JSON.stringify(error));
+					throw new MachineError(MachineErrorCode.API_REJECTED);
 				}
-				throw new MachineError(MachineErrorCode.API_SERVER_ERROR, JSON.stringify(error));
+				throw new MachineError(MachineErrorCode.API_SERVER_ERROR);
 			}
-			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR, JSON.stringify(error));
+			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
 		}
 	}
 	async removeUser({

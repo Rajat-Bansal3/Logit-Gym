@@ -20,7 +20,12 @@ import {
 	type UpdateMember,
 } from "../../shared/types/member.types";
 import type { CreateMemberMembershipInput } from "../../shared/types/payment.types";
-import { computeAge, computeMembershipEndDate } from "../../shared/utils/util_functions";
+import {
+	computeAge,
+	computeMembershipEndDate,
+	computeStreakUpdate,
+	getWeekStart,
+} from "../../shared/utils/util_functions";
 import { AuthService } from "../services/auth.service";
 
 export type MemberWithDetails = Member & {
@@ -454,9 +459,10 @@ export class MemberRepository {
 				where: { memberId: member.id },
 			});
 
-			const { newStreak, alreadyCheckedInToday } = this.getStreakUpdate(
+			const { newStreak, alreadyCheckedInToday } = computeStreakUpdate(
 				mem_metrics?.currentStreak ?? 0,
 				mem_metrics?.lastCheckIn ?? null,
+				log.timestamp,
 			);
 
 			const totalCheckIns = (mem_metrics?.totalCheckIns ?? 0) + (alreadyCheckedInToday ? 0 : 1);
@@ -494,7 +500,7 @@ export class MemberRepository {
 					data: { attendanceAggregate: aggregate },
 				});
 
-				const weekStart = this.getWeekStart(log.timestamp);
+				const weekStart = getWeekStart(log.timestamp);
 				const dayIncrement: Record<string, unknown> = {
 					[day]: { increment: 1 },
 				};
@@ -509,19 +515,6 @@ export class MemberRepository {
 						...dayCreate,
 					} as Prisma.WeeklyActivityUncheckedCreateInput,
 					update: dayIncrement as Prisma.WeeklyActivityUpdateInput,
-				});
-
-				await tx.gymMetrics.upsert({
-					where: { gymId: member.gymId },
-					create: {
-						gymId: member.gymId,
-						currentOccupancy: 1,
-						lastUpdated: new Date(),
-					},
-					update: {
-						currentOccupancy: { increment: 1 },
-						lastUpdated: new Date(),
-					},
 				});
 			}
 
@@ -544,15 +537,6 @@ export class MemberRepository {
 
 			return log;
 		});
-	}
-
-	private getWeekStart(date: Date): Date {
-		const d = new Date(Date.UTC(date.getFullYear(), date.getUTCMonth(), date.getUTCDate()));
-		const dow = d.getUTCDay(); // 0 = Sun ... 6 = Sat
-		const diffToMonday = dow === 0 ? -6 : 1 - dow;
-		d.setUTCDate(d.getUTCDate() + diffToMonday);
-		d.setUTCHours(0, 0, 0, 0);
-		return d;
 	}
 
 	async getGymOverviewReport(gymId: string, query: ReportQuery): Promise<GymOverviewReport> {
@@ -873,10 +857,8 @@ export class MemberRepository {
 			},
 		});
 	}
-	async getGymOccupancy(memberId: string) {
-		const now = new Date();
-		const windowStart = new Date(now.getTime() - 60 * 60 * 1000);
-		const gym = await this.prisma.member.findUnique({
+	async getGymOccupancy(memberId: string): Promise<number> {
+		const member = await this.prisma.member.findUnique({
 			where: {
 				id: memberId,
 			},
@@ -884,24 +866,15 @@ export class MemberRepository {
 				gymId: true,
 			},
 		});
-		if (!gym) {
+		if (!member) {
 			throw new MemberError(MemberErrorCode.NOT_FOUND, " member not found");
 		}
-		const gymId = gym.gymId;
-		return await this.prisma.$transaction([
-			this.prisma.member.count({
-				where: {
-					gymId: gymId,
-				},
-			}),
-			this.prisma.attendanceLog.count({
-				where: {
-					gymId,
-					type: CheckInType.OUT,
-					timestamp: { gte: windowStart, lte: now },
-				},
-			}),
-		]);
+		// currentOccupancy is kept fresh by the decay-occupancy cron, not computed here.
+		const metrics = await this.prisma.gymMetrics.findUnique({
+			where: { gymId: member.gymId },
+			select: { currentOccupancy: true },
+		});
+		return metrics?.currentOccupancy ?? 0;
 	}
 	async getGymAttendance(gymId: string, date: Date): Promise<MemberAttendanceOut> {
 		const startOfDay = new Date(date);
@@ -1058,41 +1031,6 @@ export class MemberRepository {
 				}),
 			),
 		);
-	}
-	private getStreakUpdate(
-		currentStreak: number,
-		lastCheckIn: Date | null,
-	): { newStreak: number; alreadyCheckedInToday: boolean } {
-		const toLocalMidnight = (date: Date): Date => {
-			const parts = new Intl.DateTimeFormat("en-US", {
-				year: "numeric",
-				month: "2-digit",
-				day: "2-digit",
-			}).formatToParts(date);
-
-			const year = parts.find((p) => p.type === "year")!.value;
-			const month = parts.find((p) => p.type === "month")!.value;
-			const day = parts.find((p) => p.type === "day")!.value;
-
-			return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
-		};
-
-		const now = toLocalMidnight(new Date());
-
-		if (!lastCheckIn) {
-			return { newStreak: 1, alreadyCheckedInToday: false };
-		}
-
-		const last = toLocalMidnight(lastCheckIn);
-		const diff = Math.floor((now.getTime() - last.getTime()) / 86_400_000);
-
-		if (diff === 0) {
-			return { newStreak: currentStreak, alreadyCheckedInToday: true };
-		}
-		if (diff === 1) {
-			return { newStreak: currentStreak + 1, alreadyCheckedInToday: false };
-		}
-		return { newStreak: 1, alreadyCheckedInToday: false };
 	}
 	async getMembers(memberCodes: number[], gymId: string) {
 		return await this.prisma.member.findMany({

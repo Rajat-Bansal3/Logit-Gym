@@ -33,13 +33,13 @@ export class MachineError extends AppError {
 			case MachineErrorCode.NOT_FOUND:
 				return "Machine not found";
 			case MachineErrorCode.REPOSITORY_ERROR:
-				return "Unexpected database error";
+				return "Something went wrong while saving machine data. Please try again.";
 			case MachineErrorCode.API_UNREACHABLE:
-				return "SmartOffice server is unreachable";
+				return "Could not reach the biometric device. Please check its connection and try again.";
 			case MachineErrorCode.API_REJECTED:
-				return "SmartOffice rejected the request";
+				return "The biometric device rejected this request. Please check the details and try again.";
 			case MachineErrorCode.API_SERVER_ERROR:
-				return "SmartOffice server encountered an error";
+				return "The biometric device encountered an error. Please try again shortly.";
 			default:
 				return "Machine error";
 		}

@@ -19,6 +19,205 @@ const GYM_BATCH_SIZE = 50;
 const MACHINE_REQUEST_TIMEOUT_MS = 5000;
 const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 
+const DAY_NAMES = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+];
+
+function toLocalMidnight(date) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(date);
+    const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+    return new Date(`${map.year}-${map.month}-${map.day}T00:00:00.000Z`);
+}
+
+function getWeekStart(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const dow = d.getUTCDay(); // 0 = Sun ... 6 = Sat
+    const diffToMonday = dow === 0 ? -6 : 1 - dow;
+    d.setUTCDate(d.getUTCDate() + diffToMonday);
+    d.setUTCHours(0, 0, 0, 0);
+    return d;
+}
+
+function getDayName(date) {
+    return DAY_NAMES[toLocalMidnight(date).getUTCDay()];
+}
+
+/**
+ * Mirrors src/shared/utils/util_functions.ts#computeStreakUpdate. Duplicated
+ * here (rather than imported) because this script runs under plain node, not
+ * ts-node — keep both in sync if the streak rules ever change.
+ */
+function computeStreakUpdate(currentStreak, lastCheckIn, referenceDate) {
+    const today = toLocalMidnight(referenceDate);
+
+    if (!lastCheckIn) {
+        return { newStreak: 1, alreadyCheckedInToday: false };
+    }
+
+    const last = toLocalMidnight(lastCheckIn);
+    const diff = Math.floor((today.getTime() - last.getTime()) / 86_400_000);
+
+    if (diff === 0) {
+        return { newStreak: currentStreak, alreadyCheckedInToday: true };
+    }
+    if (diff === 1) {
+        return { newStreak: currentStreak + 1, alreadyCheckedInToday: false };
+    }
+    return { newStreak: 1, alreadyCheckedInToday: false };
+}
+
+function attendanceKey(membershipCode, gymId, timestamp) {
+    return `${membershipCode}|${gymId}|${timestamp.getTime()}`;
+}
+
+/**
+ * Applies the same per-member/gym metric updates a live check-in would
+ * (memberMetrics, attendanceAggregate, weeklyActivity, hourlyTraffic).
+ * Callers must only pass logs already confirmed to be new (not present in
+ * attendance_logs yet) or these metrics double-count. gymMetrics.currentOccupancy
+ * is intentionally not touched here - decay-occupancy.js recomputes it fresh
+ * from attendance_logs on its own schedule.
+ */
+async function applyAttendanceMetrics(tx, logs) {
+    const memberIds = [...new Set(logs.map((l) => l.memberId))];
+
+    const [members, metricsRows] = await Promise.all([
+        tx.member.findMany({
+            where: { id: { in: memberIds } },
+            select: { id: true, gymId: true, joinDate: true, attendanceAggregate: true },
+        }),
+        tx.memberMetrics.findMany({ where: { memberId: { in: memberIds } } }),
+    ]);
+
+    const memberMap = new Map(members.map((m) => [m.id, m]));
+    const metricsMap = new Map(metricsRows.map((m) => [m.memberId, m]));
+
+    const logsByMember = new Map();
+    for (const log of logs) {
+        const list = logsByMember.get(log.memberId) ?? [];
+        list.push(log);
+        logsByMember.set(log.memberId, list);
+    }
+
+    const hourlyIncrements = new Map();
+
+    for (const [memberId, memberLogs] of logsByMember) {
+        const member = memberMap.get(memberId);
+        if (!member) {
+            continue;
+        }
+
+        const sortedLogs = [...memberLogs].sort(
+            (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+        );
+        const metrics = metricsMap.get(memberId);
+
+        let streak = metrics?.currentStreak ?? 0;
+        let lastCheckIn = metrics?.lastCheckIn ?? null;
+        let totalCheckIns = metrics?.totalCheckIns ?? 0;
+        const aggregate = [...member.attendanceAggregate];
+        const weeklyIncrements = new Map();
+
+        for (const log of sortedLogs) {
+            const { newStreak, alreadyCheckedInToday } = computeStreakUpdate(
+                streak,
+                lastCheckIn,
+                log.timestamp,
+            );
+            streak = newStreak;
+            lastCheckIn = log.timestamp;
+
+            if (!alreadyCheckedInToday) {
+                totalCheckIns += 1;
+                const dayName = getDayName(log.timestamp);
+                const dayIndex = DAY_NAMES.indexOf(dayName);
+                aggregate[dayIndex] = (aggregate[dayIndex] ?? 0) + 1;
+
+                const weekStart = getWeekStart(log.timestamp);
+                const weekKey = `${weekStart.toISOString()}|${dayName}`;
+                weeklyIncrements.set(weekKey, (weeklyIncrements.get(weekKey) ?? 0) + 1);
+            }
+
+            const dateOnly = new Date(
+                Date.UTC(
+                    log.timestamp.getUTCFullYear(),
+                    log.timestamp.getUTCMonth(),
+                    log.timestamp.getUTCDate(),
+                ),
+            );
+            const hour = log.timestamp.getUTCHours();
+            const hourKey = `${member.gymId}|${dateOnly.toISOString()}|${hour}`;
+            const hourEntry = hourlyIncrements.get(hourKey) ?? {
+                gymId: member.gymId,
+                date: dateOnly,
+                hour,
+                count: 0,
+            };
+            hourEntry.count += 1;
+            hourlyIncrements.set(hourKey, hourEntry);
+        }
+
+        const daysSinceJoin = Math.max(
+            1,
+            Math.ceil((lastCheckIn.getTime() - member.joinDate.getTime()) / 86_400_000),
+        );
+        const attendancePercentage = Math.min(100, (totalCheckIns / daysSinceJoin) * 100);
+
+        await tx.memberMetrics.upsert({
+            where: { memberId },
+            create: {
+                memberId,
+                lastCheckIn,
+                totalCheckIns,
+                currentStreak: streak,
+                attendancePercentage,
+                lastUpdated: new Date(),
+            },
+            update: {
+                lastCheckIn,
+                totalCheckIns,
+                currentStreak: streak,
+                attendancePercentage,
+                lastUpdated: new Date(),
+            },
+        });
+
+        await tx.member.update({
+            where: { id: memberId },
+            data: { attendanceAggregate: aggregate },
+        });
+
+        for (const [weekKey, increment] of weeklyIncrements) {
+            const [weekStartIso, dayName] = weekKey.split("|");
+            const weekStart = new Date(weekStartIso);
+
+            await tx.weeklyActivity.upsert({
+                where: { memberId_weekStart: { memberId, weekStart } },
+                create: { memberId, gymId: member.gymId, weekStart, [dayName]: increment },
+                update: { [dayName]: { increment } },
+            });
+        }
+    }
+
+    for (const entry of hourlyIncrements.values()) {
+        await tx.hourlyTraffic.upsert({
+            where: { gymId_date_hour: { gymId: entry.gymId, date: entry.date, hour: entry.hour } },
+            create: { gymId: entry.gymId, date: entry.date, hour: entry.hour, count: entry.count },
+            update: { count: { increment: entry.count } },
+        });
+    }
+}
+
 const MACHINE_SERVER = process.env.MACHINE_SERVER;
 const MACHINE_SERVER_API_KEY = process.env.MACHINE_SERVER_API_KEY;
 
@@ -173,19 +372,44 @@ async function syncGymAttendance(gym, dateStr) {
         return { gymId: gym.id, fetched: logs.length, inserted: 0, skippedLogs };
     }
 
-    // skipDuplicates relies on AttendanceLog's @@unique([membershipCode,
-    // gymId, timestamp]) — this is what makes it safe to re-fetch the whole
-    // day's logs from the machine on every single tick without ever
-    // double-inserting the same check-in.
-    const result = await prisma.attendanceLog.createMany({
-        data,
-        skipDuplicates: true,
+    // AttendanceLog's @@unique([membershipCode, gymId, timestamp]) is what makes
+    // it safe to re-fetch the whole day's logs from the machine on every tick.
+    // We still resolve which specific rows are actually new *before* inserting
+    // so the metrics update below only ever accounts for genuinely new
+    // check-ins — re-synced logs never bump memberMetrics/occupancy/etc twice.
+    const existing = await prisma.attendanceLog.findMany({
+        where: {
+            OR: data.map((log) => ({
+                membershipCode: log.membershipCode,
+                gymId: log.gymId,
+                timestamp: log.timestamp,
+            })),
+        },
+        select: { membershipCode: true, gymId: true, timestamp: true },
     });
+    const existingKeys = new Set(
+        existing.map((log) => attendanceKey(log.membershipCode, log.gymId, log.timestamp)),
+    );
+    const newLogs = data.filter(
+        (log) => !existingKeys.has(attendanceKey(log.membershipCode, log.gymId, log.timestamp)),
+    );
+
+    if (newLogs.length === 0) {
+        return { gymId: gym.id, fetched: logs.length, inserted: 0, skippedLogs };
+    }
+
+    await prisma.$transaction(
+        async (tx) => {
+            await tx.attendanceLog.createMany({ data: newLogs, skipDuplicates: true });
+            await applyAttendanceMetrics(tx, newLogs);
+        },
+        { timeout: 30000, maxWait: 30000 },
+    );
 
     return {
         gymId: gym.id,
         fetched: logs.length,
-        inserted: result.count,
+        inserted: newLogs.length,
         skippedLogs,
     };
 }

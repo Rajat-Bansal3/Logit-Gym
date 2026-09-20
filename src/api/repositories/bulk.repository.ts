@@ -1,6 +1,8 @@
 import { createId as cuid } from "@paralleldrive/cuid2";
 import { type CheckInType, Prisma, type PrismaClient } from "../../generated/client";
 import type { ValidMember } from "../../shared/types/gym.types";
+import { days } from "../../shared/types/member.types";
+import { computeStreakUpdate, getDayName, getWeekStart } from "../../shared/utils/util_functions";
 import { AuthService } from "../services/auth.service";
 
 export type createManyAttendanceType = {
@@ -11,6 +13,8 @@ export type createManyAttendanceType = {
 	type: CheckInType;
 }[];
 
+type AttendanceLogInput = createManyAttendanceType[number];
+
 export class BulkRepository {
 	private client: PrismaClient;
 	private authService: AuthService;
@@ -19,11 +23,198 @@ export class BulkRepository {
 		this.authService = new AuthService();
 	}
 
-	async syncAttenceWithLogs(data: createManyAttendanceType) {
-		await this.client.attendanceLog.createMany({
-			data: data,
-			skipDuplicates: true,
+	/**
+	 * Inserts only attendance logs that don't already exist (by membershipCode +
+	 * gymId + timestamp) and rolls their effect into the same metrics
+	 * (memberMetrics, attendanceAggregate, weeklyActivity, hourlyTraffic) that a
+	 * live check-in updates. Safe to call repeatedly with overlapping data -
+	 * re-synced logs are skipped and never double-count metrics.
+	 * gymMetrics.currentOccupancy is intentionally not touched here - it's
+	 * fully recomputed from attendance_logs by the decay-occupancy cron.
+	 * Returns the number of logs that were newly recorded.
+	 */
+	async syncAttenceWithLogs(data: createManyAttendanceType): Promise<number> {
+		if (data.length === 0) {
+			return 0;
+		}
+
+		const existing = await this.client.attendanceLog.findMany({
+			where: {
+				OR: data.map((log) => ({
+					membershipCode: log.membershipCode,
+					gymId: log.gymId,
+					timestamp: log.timestamp,
+				})),
+			},
+			select: { membershipCode: true, gymId: true, timestamp: true },
 		});
+
+		const existingKeys = new Set(
+			existing.map((log) => this.attendanceKey(log.membershipCode, log.gymId, log.timestamp)),
+		);
+
+		const newLogs = data.filter(
+			(log) => !existingKeys.has(this.attendanceKey(log.membershipCode, log.gymId, log.timestamp)),
+		);
+
+		if (newLogs.length === 0) {
+			return 0;
+		}
+
+		await this.client.$transaction(
+			async (tx) => {
+				await tx.attendanceLog.createMany({ data: newLogs, skipDuplicates: true });
+				await this.applyAttendanceMetrics(tx, newLogs);
+			},
+			{ timeout: 30000, maxWait: 30000 },
+		);
+
+		return newLogs.length;
+	}
+
+	private attendanceKey(membershipCode: number, gymId: string, timestamp: Date): string {
+		return `${membershipCode}|${gymId}|${timestamp.getTime()}`;
+	}
+
+	private async applyAttendanceMetrics(
+		tx: Prisma.TransactionClient,
+		logs: AttendanceLogInput[],
+	): Promise<void> {
+		const memberIds = [...new Set(logs.map((log) => log.memberId))];
+
+		const [members, metricsRows] = await Promise.all([
+			tx.member.findMany({
+				where: { id: { in: memberIds } },
+				select: { id: true, gymId: true, joinDate: true, attendanceAggregate: true },
+			}),
+			tx.memberMetrics.findMany({ where: { memberId: { in: memberIds } } }),
+		]);
+
+		const memberMap = new Map(members.map((m) => [m.id, m]));
+		const metricsMap = new Map(metricsRows.map((m) => [m.memberId, m]));
+
+		const logsByMember = new Map<string, AttendanceLogInput[]>();
+		for (const log of logs) {
+			const list = logsByMember.get(log.memberId) ?? [];
+			list.push(log);
+			logsByMember.set(log.memberId, list);
+		}
+
+		const hourlyIncrements = new Map<
+			string,
+			{ gymId: string; date: Date; hour: number; count: number }
+		>();
+
+		for (const [memberId, memberLogs] of logsByMember) {
+			const member = memberMap.get(memberId);
+			if (!member) {
+				continue;
+			}
+
+			const sortedLogs = [...memberLogs].sort(
+				(a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+			);
+			const metrics = metricsMap.get(memberId);
+
+			let streak = metrics?.currentStreak ?? 0;
+			let lastCheckIn = metrics?.lastCheckIn ?? null;
+			let totalCheckIns = metrics?.totalCheckIns ?? 0;
+			const aggregate = [...member.attendanceAggregate];
+			const weeklyIncrements = new Map<string, number>();
+
+			for (const log of sortedLogs) {
+				const { newStreak, alreadyCheckedInToday } = computeStreakUpdate(
+					streak,
+					lastCheckIn,
+					log.timestamp,
+				);
+				streak = newStreak;
+				lastCheckIn = log.timestamp;
+
+				if (!alreadyCheckedInToday) {
+					totalCheckIns += 1;
+					const dayName = getDayName(log.timestamp);
+					const dayIndex = days.indexOf(dayName);
+					aggregate[dayIndex] = (aggregate[dayIndex] ?? 0) + 1;
+
+					const weekStart = getWeekStart(log.timestamp);
+					const weekKey = `${weekStart.toISOString()}|${dayName}`;
+					weeklyIncrements.set(weekKey, (weeklyIncrements.get(weekKey) ?? 0) + 1);
+				}
+
+				const dateOnly = new Date(
+					Date.UTC(
+						log.timestamp.getUTCFullYear(),
+						log.timestamp.getUTCMonth(),
+						log.timestamp.getUTCDate(),
+					),
+				);
+				const hour = log.timestamp.getUTCHours();
+				const hourKey = `${member.gymId}|${dateOnly.toISOString()}|${hour}`;
+				const hourEntry = hourlyIncrements.get(hourKey) ?? {
+					gymId: member.gymId,
+					date: dateOnly,
+					hour,
+					count: 0,
+				};
+				hourEntry.count += 1;
+				hourlyIncrements.set(hourKey, hourEntry);
+			}
+
+			const daysSinceJoin = Math.max(
+				1,
+				Math.ceil((lastCheckIn!.getTime() - member.joinDate.getTime()) / 86_400_000),
+			);
+			const attendancePercentage = Math.min(100, (totalCheckIns / daysSinceJoin) * 100);
+
+			await tx.memberMetrics.upsert({
+				where: { memberId },
+				create: {
+					memberId,
+					lastCheckIn,
+					totalCheckIns,
+					currentStreak: streak,
+					attendancePercentage,
+					lastUpdated: new Date(),
+				},
+				update: {
+					lastCheckIn,
+					totalCheckIns,
+					currentStreak: streak,
+					attendancePercentage,
+					lastUpdated: new Date(),
+				},
+			});
+
+			await tx.member.update({
+				where: { id: memberId },
+				data: { attendanceAggregate: aggregate },
+			});
+
+			for (const [weekKey, increment] of weeklyIncrements) {
+				const [weekStartIso, dayName] = weekKey.split("|") as [string, (typeof days)[number]];
+				const weekStart = new Date(weekStartIso);
+
+				await tx.weeklyActivity.upsert({
+					where: { memberId_weekStart: { memberId, weekStart } },
+					create: {
+						memberId,
+						gymId: member.gymId,
+						weekStart,
+						[dayName]: increment,
+					} as Prisma.WeeklyActivityUncheckedCreateInput,
+					update: { [dayName]: { increment } } as Prisma.WeeklyActivityUpdateInput,
+				});
+			}
+		}
+
+		for (const entry of hourlyIncrements.values()) {
+			await tx.hourlyTraffic.upsert({
+				where: { gymId_date_hour: { gymId: entry.gymId, date: entry.date, hour: entry.hour } },
+				create: { gymId: entry.gymId, date: entry.date, hour: entry.hour, count: entry.count },
+				update: { count: { increment: entry.count } },
+			});
+		}
 	}
 	// async BulkUploadMembersExcel(
 	// 	gymId: string,
@@ -331,5 +522,5 @@ export class BulkRepository {
 		);
 	}
 
-	async BulkUploadMembersMachine(_gymId: string, _members: number[], _serialNumber: string) {}
+	async BulkUploadMembersMachine(_gymId: string, _members: number[], _serialNumber: string) { }
 }

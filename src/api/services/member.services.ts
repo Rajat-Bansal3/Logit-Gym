@@ -482,12 +482,12 @@ export class MemberService {
 	}
 	async getGymOccupancy(memberId: string): Promise<BaseResponse<number>> {
 		this.logger.debug("getGymOccupancy request recieved");
-		const [total_members, checkOuts] = await this.memberRepository.getGymOccupancy(memberId);
+		const occupancy = await this.memberRepository.getGymOccupancy(memberId);
 
 		return {
 			message: "Occupancy fetched successfully",
 			success: true,
-			data: Math.max(0, checkOuts / total_members),
+			data: occupancy,
 		};
 	}
 	async getMemberMembership(memberId: string): Promise<

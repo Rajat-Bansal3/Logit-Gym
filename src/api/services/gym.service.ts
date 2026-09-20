@@ -292,11 +292,11 @@ export class GymService {
 			await this.planRepository.createSub(gymId, plan.id, subscription.id, plan);
 		} catch (error) {
 			await deleteRZPSubscription(subscription.id);
-			return {
-				message: "no subscription created, cancelled",
-				data: error,
-				success: false,
-			};
+			this.logger.error("createGymSubscription: failed to persist subscription", { error });
+			throw new GymError(
+				GymErrorCode.BAD_REQUEST,
+				"Could not create your subscription. Please try again.",
+			);
 		}
 		return {
 			message: "successfully created subscription",
@@ -359,11 +359,11 @@ export class GymService {
 				data: 0,
 			};
 		}
-		await this.bulkRepository.syncAttenceWithLogs(data);
+		const inserted = await this.bulkRepository.syncAttenceWithLogs(data);
 		return {
 			message: "successfully synced",
 			success: true,
-			data: data.length,
+			data: inserted,
 		};
 	};
 	createPlan = async (

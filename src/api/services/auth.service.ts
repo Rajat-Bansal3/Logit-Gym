@@ -24,11 +24,11 @@ export class AuthService {
 		const user = await this.userRepository.getUserByUsername(data.username);
 		console.log(user);
 		if (!user || user === null) {
-			throw new AuthError(AuthErrorCode.FORBIDDEN, "invalid credentials");
+			throw new AuthError(AuthErrorCode.FORBIDDEN, "Invalid username or password");
 		}
 		const isValid = await this.comparePassword(data.password, user.password);
 		if (!isValid) {
-			throw new AuthError(AuthErrorCode.FORBIDDEN, "invalid credentials");
+			throw new AuthError(AuthErrorCode.FORBIDDEN, "Invalid username or password");
 		}
 
 		const tokens = await this.generateTokens(user.id, user.role);
@@ -50,7 +50,10 @@ export class AuthService {
 	async register(data: RegisterInput): Promise<BaseResponse<registerReturnType>> {
 		const user = await this.userRepository.getUserByUsername(data.username);
 		if (user) {
-			throw new AuthError(AuthErrorCode.FORBIDDEN, "username already exists");
+			throw new AuthError(
+				AuthErrorCode.CONFLICT,
+				"This username is already taken. Please choose a different one.",
+			);
 		}
 		const pass = await this.hashPassword(data.password);
 		const newUser = await this.userRepository.createUser({

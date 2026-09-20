@@ -1,83 +1,35 @@
-// TODO
 // scripts/decay-occupancy.js
 // Run via linux cron, e.g.:
-// */5 * * * * cd /path/to/app && node scripts/decay-occupancy.js >> logs/occupancy-decay.log 2>&1
+// */10 * * * * cd /path/to/app && node scripts/decay-occupancy.js >> logs/occupancy-decay.log 2>&1
 
 const { PrismaClient } = require("../src/generated");
 
 const prisma = new PrismaClient();
 
-const SESSION_WINDOW_MS = 90 * 60 * 1000; // 90 min, tune per business
+// "Occupancy" = number of members who checked in within this trailing window.
+// A check-in ages out of the count once it's older than this — each run just
+// recounts from scratch, no incremental decay/watermark bookkeeping needed.
+const OCCUPANCY_WINDOW_MS = 90 * 60 * 1000; // 1.5 hours
 const GYM_BATCH_SIZE = 50;
 
-async function decayGymOccupancy(gym, now) {
-  // First run for this gym: no watermark yet.
-  // Seed it to (now - sessionWindow) so we don't try to decay
-  // check-ins from the dawn of time on the first execution.
-  const watermark =
-    gym.gymMetrics?.occupancyWatermark ??
-    new Date(now.getTime() - SESSION_WINDOW_MS);
+async function recomputeGymOccupancy(gym, now) {
+  const windowStart = new Date(now.getTime() - OCCUPANCY_WINDOW_MS);
 
-  // A check-in "ages out" once (timestamp + window) has passed.
-  // So we want IN logs whose timestamp falls in:
-  //   (watermark - window, now - window]
-  const rangeStart = new Date(watermark.getTime() - SESSION_WINDOW_MS);
-  const rangeEnd = new Date(now.getTime() - SESSION_WINDOW_MS);
-
-  const expiredCount = await prisma.attendanceLog.count({
+  const occupancy = await prisma.attendanceLog.count({
     where: {
       gymId: gym.id,
       type: "IN",
-      timestamp: {
-        gt: rangeStart,
-        lte: rangeEnd,
-      },
+      timestamp: { gte: windowStart, lte: now },
     },
   });
 
-  if (expiredCount === 0) {
-    // Still advance the watermark even with zero expirations,
-    // otherwise a quiet gym re-scans the same empty range forever.
-    await prisma.gymMetrics.upsert({
-      where: { gymId: gym.id },
-      create: {
-        gymId: gym.id,
-        currentOccupancy: 0,
-        occupancyWatermark: now,
-        lastUpdated: now,
-      },
-      update: {
-        occupancyWatermark: now,
-        lastUpdated: now,
-      },
-    });
-    return { gymId: gym.id, expiredCount: 0 };
-  }
-
-  await prisma.$transaction(async (tx) => {
-    const metrics = await tx.gymMetrics.findUnique({
-      where: { gymId: gym.id },
-    });
-    const current = metrics?.currentOccupancy ?? 0;
-    const nextOccupancy = Math.max(0, current - expiredCount);
-
-    await tx.gymMetrics.upsert({
-      where: { gymId: gym.id },
-      create: {
-        gymId: gym.id,
-        currentOccupancy: 0, // no prior state existed, nothing to decrement from
-        occupancyWatermark: now,
-        lastUpdated: now,
-      },
-      update: {
-        currentOccupancy: nextOccupancy,
-        occupancyWatermark: now,
-        lastUpdated: now,
-      },
-    });
+  await prisma.gymMetrics.upsert({
+    where: { gymId: gym.id },
+    create: { gymId: gym.id, currentOccupancy: occupancy, lastUpdated: now },
+    update: { currentOccupancy: occupancy, lastUpdated: now },
   });
 
-  return { gymId: gym.id, expiredCount };
+  return { gymId: gym.id, occupancy };
 }
 
 async function run() {
@@ -85,7 +37,7 @@ async function run() {
   const now = new Date();
   let cursor = null;
   let processed = 0;
-  let totalExpired = 0;
+  let totalOccupancy = 0;
   const errors = [];
 
   // Cursor-paginate gyms so this scales past a handful of tenants
@@ -96,7 +48,7 @@ async function run() {
       take: GYM_BATCH_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { id: "asc" },
-      include: { gymMetrics: true },
+      select: { id: true },
     });
 
     if (gyms.length === 0) break;
@@ -104,13 +56,13 @@ async function run() {
     // Process gyms in this batch concurrently, but isolate failures
     // per-gym so one bad row doesn't kill the whole cron run.
     const results = await Promise.allSettled(
-      gyms.map((gym) => decayGymOccupancy(gym, now)),
+      gyms.map((gym) => recomputeGymOccupancy(gym, now)),
     );
 
     results.forEach((result, i) => {
       if (result.status === "fulfilled") {
         processed += 1;
-        totalExpired += result.value.expiredCount;
+        totalOccupancy += result.value.occupancy;
       } else {
         errors.push({
           gymId: gyms[i].id,
@@ -128,7 +80,7 @@ async function run() {
     JSON.stringify({
       job: "decay-occupancy",
       processed,
-      totalExpired,
+      totalOccupancy,
       errorCount: errors.length,
       errors,
       durationMs,
@@ -154,3 +106,4 @@ run()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
