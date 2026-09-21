@@ -35,7 +35,7 @@ export type GetPaymentsOutput = {
 };
 export const createMembershipSchema = z.object({
 	startDate: z.coerce.date(),
-	predecessor: z.string().min(1).max(100),
+	predecessor: z.string().min(1).max(100).optional(),
 	packageId: z.string(),
 	serialNumber: z.array(z.string()).optional(),
 	isMachine: z.boolean(),

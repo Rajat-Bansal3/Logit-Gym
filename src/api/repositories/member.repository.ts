@@ -947,6 +947,7 @@ export class MemberRepository {
 			include: {
 				member: {
 					select: {
+						id: true,
 						membershipCode: true,
 					},
 				},
@@ -989,7 +990,13 @@ export class MemberRepository {
 						},
 					});
 				}
-				if (currentMembership?.endDate && currentMembership.endDate > new Date()) {
+
+				// Only promote the new membership to "current" if the existing one has
+				// already ended (or there wasn't one). Otherwise the current membership
+				// is still active and the new one is a scheduled/future membership.
+				const currentIsStillActive =
+					currentMembership?.endDate && currentMembership.endDate > new Date();
+				if (!currentIsStillActive) {
 					await tx.member.update({
 						where: {
 							id: memberId,

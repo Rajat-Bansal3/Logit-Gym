@@ -35,11 +35,11 @@ export class MachineError extends AppError {
 			case MachineErrorCode.REPOSITORY_ERROR:
 				return "Something went wrong while saving machine data. Please try again.";
 			case MachineErrorCode.API_UNREACHABLE:
-				return "Could not reach the biometric device. Please check its connection and try again.";
+				return "Could not reach the biometric registration service. Please check the service connection and try again.";
 			case MachineErrorCode.API_REJECTED:
-				return "The biometric device rejected this request. Please check the details and try again.";
+				return "The biometric registration service rejected this request. Please check the details and try again.";
 			case MachineErrorCode.API_SERVER_ERROR:
-				return "The biometric device encountered an error. Please try again shortly.";
+				return "The biometric registration service encountered an error. Please try again shortly.";
 			default:
 				return "Machine error";
 		}

@@ -1,5 +1,5 @@
 import { env } from "../../env";
-import type { CheckInType, Gym, Payment, Prisma, PrismaClient } from "../../generated/client";
+import type { CheckInType, Gym, Membership, Payment, Prisma, PrismaClient } from "../../generated/client";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import type { AuthenticatedUser, ChangePasswordMember } from "../../shared/types/auth.types";
@@ -125,6 +125,19 @@ export class MemberService {
 		data: MemberToMachine,
 		_user: AuthenticatedUser,
 	): Promise<BaseResponse<null>> {
+		const member = await this.memberRepository.findByIdAndGym(data.memberId, gymId);
+		if (!member || member.isDeleted) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "Member not found");
+		}
+
+		const membershipEndDate = member.currentMembership?.endDate;
+		if (!membershipEndDate || membershipEndDate <= new Date()) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"This member needs an active membership before they can be added to a biometric device. Renew their membership first.",
+			);
+		}
+
 		const machines = await this.machineRepository.getMachines(gymId, data.serialNumbers);
 		if (machines.length < data.serialNumbers.length) {
 			throw new MemberError(MemberErrorCode.NOT_FOUND, "one or more serial number not found");
@@ -144,6 +157,18 @@ export class MemberService {
 			machines.map((machine) => machine.id),
 			data.memberId,
 		);
+		const expiryWasSet = await this.machineRepository.setUserExpiration({
+			apiKey: env.MACHINE_SERVER_API_KEY,
+			biometricCode: member.membershipCode,
+			expirationDate: membershipEndDate,
+			serialNumbers: data.serialNumbers,
+		});
+		if (!expiryWasSet) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"The member was added to the biometric device, but its expiry date could not be set. Check the device connection and retry the member assignment.",
+			);
+		}
 		return {
 			message: "Member assigned to machines successfully",
 			success: true,
@@ -511,15 +536,30 @@ export class MemberService {
 		gymId: string,
 		data: CreateMemberMembershipInput,
 	): Promise<BaseResponse<null>> {
+		const member = await this.memberRepository.findByIdAndGym(memberId, gymId);
+		if (!member || member.isDeleted) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "Member not found");
+		}
+
 		const membershipPackage = await this.gymRepository.getMembershipPackage(gymId, data.packageId);
 		if (!membershipPackage) {
-			throw new MemberError(MemberErrorCode.BAD_REQUEST, "package with package id not found");
+			throw new MemberError(MemberErrorCode.BAD_REQUEST, "The selected membership plan is no longer available.");
 		}
-		const latest_membership = await this.memberRepository.getMembership(data.predecessor);
-		if (!latest_membership) {
+
+		let previousMembership: Membership | undefined;
+		if (data.predecessor) {
+			const requestedPredecessor = await this.memberRepository.getMembership(data.predecessor);
+			if (!requestedPredecessor || requestedPredecessor.member.id !== memberId) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"The previous membership could not be found. Refresh the member and try again.",
+				);
+			}
+			previousMembership = requestedPredecessor;
+		} else if (member.currentMembership) {
 			throw new MemberError(
 				MemberErrorCode.BAD_REQUEST,
-				"no membership with provided predicessor id found",
+				"An existing membership was found. Refresh the member and renew it again.",
 			);
 		}
 
@@ -527,15 +567,21 @@ export class MemberService {
 			memberId,
 			data,
 			membershipPackage,
-			latest_membership,
+			previousMembership,
 		);
 		if (data.isMachine && data.serialNumber && membership.endDate) {
-			await this.machineRepository.setUserExpiration({
+			const expiryWasSet = await this.machineRepository.setUserExpiration({
 				apiKey: env.MACHINE_SERVER_API_KEY,
 				biometricCode: membership.member.membershipCode,
 				expirationDate: membership.endDate,
 				serialNumbers: data.serialNumber,
 			});
+			if (!expiryWasSet) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"The membership was saved, but its expiry date could not be set on the biometric device. Check the device connection and retry the membership update.",
+				);
+			}
 		}
 		return {
 			message: "memberships create successfully",
@@ -784,7 +830,7 @@ export class MemberService {
 				membershipCode,
 				data: {
 					EmployeeCode: row.EmployeeCode,
-					...(row.EmployeeName && { EmployeeName: row.EmployeeName }),
+					EmployeeName: row.EmployeeName,
 					...(row.Gender && { Gender: row.Gender }),
 					...(row.PhoneNumber && { PhoneNumber: row.PhoneNumber }),
 					...(row.EmergencyContact && {

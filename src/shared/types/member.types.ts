@@ -76,7 +76,7 @@ export const listMembersQuerySchema = z.object({
 	search: z.string().optional(),
 	page: z.coerce.number().min(1).default(1),
 	limit: z.coerce.number().min(1).max(100).default(20),
-	category: z.enum(["active", "expiring", "deleted", "expired", "no-machine"]),
+	category: z.enum(["active", "expiring", "deleted", "expired", "no-machine"]).default("active"),
 });
 
 export const markAttendanceSchema = z.object({

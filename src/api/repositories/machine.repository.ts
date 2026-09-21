@@ -42,7 +42,7 @@ export class MachineRepository {
 					DeviceName: machineId,
 					SerialNumber: serialNumber,
 				},
-				timeout: 5000,
+				timeout: 20000,
 			});
 			return result.data;
 		} catch (error) {
@@ -108,6 +108,10 @@ export class MachineRepository {
 		serialNumbers,
 		memberName,
 		biometricCode,
+		IsBioPasswordUpload,
+		IsCardUpload,
+		IsFaceUpload,
+		IsFPUpload,
 	}: {
 		apiKey: string;
 		serialNumbers: string[];
@@ -127,7 +131,10 @@ export class MachineRepository {
 					EmployeeCode: String(biometricCode),
 					CardNumber: cardNumber || "",
 					SerialNumbers: Array.isArray(serialNumbers) ? serialNumbers.join(",") : serialNumbers,
-					IsFPUpload: false,
+					IsBioPasswordUpload,
+					IsCardUpload,
+					IsFaceUpload,
+					IsFPUpload,
 				},
 				timeout: 10000,
 				headers: { "Content-Type": "application/json" },
@@ -200,7 +207,7 @@ export class MachineRepository {
 		serialNumbers: string[];
 		biometricCode: number;
 		expirationDate: Date;
-	}): Promise<string> {
+	}): Promise<boolean> {
 		const formattedDate = new Date(expirationDate).toISOString().split("T")[0];
 
 		const results = await Promise.allSettled(
@@ -218,9 +225,7 @@ export class MachineRepository {
 					.then((r) => r.statusText),
 			),
 		);
-		const { allOk, summary } = this.summarizeSettled(serialNumbers, results);
-		console.log(allOk);
-		console.log(summary);
+		const { allOk } = this.summarizeSettled(serialNumbers, results);
 		return allOk;
 	}
 	async getDeviceLogs(serialNumbers: string[], apiKey: string, date: string): Promise<LogType[]> {

@@ -106,7 +106,7 @@ export const bulkAddSchema = z.object({
 });
 export const bulkMember = z.object({
 	EmployeeCode: z.number(),
-	EmployeeName: z.string().optional(),
+	EmployeeName: z.string().trim().min(1, "EmployeeName is required"),
 	Gender: z.string().optional(),
 	PhoneNumber: z.number().optional(),
 	EmergencyContact: z.number().optional(),
