@@ -215,10 +215,10 @@ export class MachineRepository {
 				axios
 					.get(`${env.MACHINE_SERVER}/SetUserExpiration`, {
 						params: {
-							APIKey: apiKey,
-							SerialNumber: sn,
+							APIKey: String(apiKey),
+							SerialNumber: String(sn),
 							EmployeeCode: String(biometricCode),
-							ExpirationDate: formattedDate,
+							ExpirationDate: String(formattedDate),
 						},
 						timeout: 5000,
 					})
@@ -231,10 +231,10 @@ export class MachineRepository {
 	async getDeviceLogs(serialNumbers: string[], apiKey: string, date: string): Promise<LogType[]> {
 		const results = await axios.get(`${env.MACHINE_SERVER}/GetDeviceLogs`, {
 			params: {
-				APIKey: apiKey,
-				SerialNumber: serialNumbers,
-				FromDate: date,
-				ToDate: date,
+				APIKey: String(apiKey),
+				SerialNumber: serialNumbers.map(String).join(","),
+				FromDate: String(date),
+				ToDate: String(date),
 			},
 			timeout: 5000,
 		});

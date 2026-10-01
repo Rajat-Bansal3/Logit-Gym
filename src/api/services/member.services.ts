@@ -92,6 +92,13 @@ export class MemberService {
 		);
 
 		if (data.isMachine && data.serialNumbers) {
+			const membershipEndDate = member.currentMembership?.endDate;
+			if (!membershipEndDate) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"The member membership end date could not be determined for biometric expiry setup.",
+				);
+			}
 			await this.machineRepository.addUser({
 				memberName: member.name,
 				biometricCode: member.membershipCode,
@@ -103,13 +110,17 @@ export class MemberService {
 				IsFaceUpload: data.IsFaceUpload ?? false,
 				IsFPUpload: data.IsFPUpload ?? false,
 			});
-			if (member.currentMembership?.endDate) {
-				await this.machineRepository.setUserExpiration({
-					apiKey: env.MACHINE_SERVER_API_KEY,
-					biometricCode: member.membershipCode,
-					expirationDate: member.currentMembership?.endDate,
-					serialNumbers: data.serialNumbers,
-				});
+			const expiryWasSet = await this.machineRepository.setUserExpiration({
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				biometricCode: member.membershipCode,
+				expirationDate: membershipEndDate,
+				serialNumbers: data.serialNumbers,
+			});
+			if (!expiryWasSet) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"The member was added to the biometric device, but its expiry date could not be set. Check the device connection and retry the member assignment.",
+				);
 			}
 		}
 
