@@ -98,7 +98,7 @@ export const createSubscriptionSchema = z.object({
 export const syncDataSchema = z.object({
 	gymId: z.string(),
 	date: z.string(),
-	serialNumber: z.array(z.string()),
+	serialNumber: z.array(z.string()).min(1),
 });
 export const bulkAddSchema = z.object({
 	method: z.enum(["machineSync", "excel"]),

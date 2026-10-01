@@ -49,6 +49,14 @@ export const onboardMemberSchema = z.object({
 	IsCardUpload: multipartBoolean.optional(),
 	IsFaceUpload: multipartBoolean.optional(),
 	IsFPUpload: multipartBoolean.optional(),
+}).superRefine((data, ctx) => {
+	if (data.isMachine && !data.serialNumbers?.length) {
+		ctx.addIssue({
+			code: "custom",
+			path: ["serialNumbers"],
+			message: "At least one machine serial number is required when isMachine is true",
+		});
+	}
 });
 export const memberToMachineSchema = z.object({
 	memberId: z.string(),

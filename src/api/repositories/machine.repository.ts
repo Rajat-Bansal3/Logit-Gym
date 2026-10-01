@@ -208,6 +208,8 @@ export class MachineRepository {
 		biometricCode: number;
 		expirationDate: Date;
 	}): Promise<boolean> {
+		if (serialNumbers.length === 0) return false;
+
 		const formattedDate = new Date(expirationDate).toISOString().split("T")[0];
 
 		const results = await Promise.allSettled(
@@ -225,7 +227,13 @@ export class MachineRepository {
 					.then((r) => r.statusText),
 			),
 		);
-		const { allOk } = this.summarizeSettled(serialNumbers, results);
+		const { allOk, summary } = this.summarizeSettled(serialNumbers, results);
+		if (!allOk) {
+			console.error(
+				"SetUserExpiration failed for one or more devices",
+				summary.filter((result: any) => !result.ok),
+			);
+		}
 		return allOk;
 	}
 	async getDeviceLogs(serialNumbers: string[], apiKey: string, date: string): Promise<LogType[]> {
