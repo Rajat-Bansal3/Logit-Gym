@@ -1,6 +1,22 @@
 import { z } from "zod";
 import { MemberStatus } from "../../generated/enums";
 
+const multipartBoolean = z.preprocess((value) => {
+	if (value === "true") return true;
+	if (value === "false") return false;
+	return value;
+}, z.boolean());
+
+const multipartStringArray = z.preprocess((value) => {
+	if (typeof value !== "string") return value;
+
+	try {
+		return JSON.parse(value);
+	} catch {
+		return value;
+	}
+}, z.array(z.string()));
+
 export const days = [
 	"sunday",
 	"monday",
@@ -26,13 +42,13 @@ export const onboardMemberSchema = z.object({
 
 	membershipStartDate: z.coerce.date(),
 	packageId: z.string(),
-	isMachine: z.boolean().default(false),
-	serialNumbers: z.array(z.string()).optional(),
+	isMachine: multipartBoolean.default(false),
+	serialNumbers: multipartStringArray.optional(),
 	cardNumber: z.string().optional(),
-	IsBioPasswordUpload: z.boolean().optional(),
-	IsCardUpload: z.boolean().optional(),
-	IsFaceUpload: z.boolean().optional(),
-	IsFPUpload: z.boolean().optional(),
+	IsBioPasswordUpload: multipartBoolean.optional(),
+	IsCardUpload: multipartBoolean.optional(),
+	IsFaceUpload: multipartBoolean.optional(),
+	IsFPUpload: multipartBoolean.optional(),
 });
 export const memberToMachineSchema = z.object({
 	memberId: z.string(),

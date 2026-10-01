@@ -98,10 +98,10 @@ export class MemberService {
 				apiKey: env.MACHINE_SERVER_API_KEY,
 				serialNumbers: data.serialNumbers,
 				cardNumber: data.cardNumber,
-				IsBioPasswordUpload: false,
-				IsCardUpload: false,
-				IsFaceUpload: false,
-				IsFPUpload: false,
+				IsBioPasswordUpload: data.IsBioPasswordUpload ?? false,
+				IsCardUpload: data.IsCardUpload ?? false,
+				IsFaceUpload: data.IsFaceUpload ?? false,
+				IsFPUpload: data.IsFPUpload ?? false,
 			});
 			if (member.currentMembership?.endDate) {
 				await this.machineRepository.setUserExpiration({
