@@ -4,7 +4,6 @@ import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import type { AuthenticatedUser, ChangePasswordMember } from "../../shared/types/auth.types";
 import type { bulkAddMembers, ValidMember } from "../../shared/types/gym.types";
-import type { MachineData } from "../../shared/types/machine.types";
 import {
 	type ListMembersQuery,
 	type MarkAttendance,
@@ -63,6 +62,11 @@ export class MemberService {
 			throw new GymError(GymErrorCode.NOT_FOUND, "gym not found");
 		}
 		const existingPhone = await this.memberRepository.findByPhone(data.phone!, gym.id);
+		if (existingPhone?.isDeleted) {
+			// Re-adding a previously deleted member restores their record (and its
+			// history) instead of creating a conflicting duplicate row.
+			return this.reactivateDeletedMember(gym.id, existingPhone.id, data, image);
+		}
 		if (existingPhone) {
 			throw new MemberError(
 				MemberErrorCode.CONFLICT,
@@ -76,6 +80,12 @@ export class MemberService {
 
 		if (!membershipCode) {
 			throw new MemberError(MemberErrorCode.BAD_REQUEST, "membership code not provided");
+		}
+		if (!data.packageId || !data.membershipStartDate) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"A membership plan and start date are required to onboard a member.",
+			);
 		}
 		const membershipPackage = await this.gymRepository.getMembershipPackage(gymId, data.packageId);
 		if (!membershipPackage) {
@@ -130,6 +140,96 @@ export class MemberService {
 			message: "Member onboarded successfully",
 			success: true,
 			data: { memberId: member.id },
+		};
+	}
+
+	private async reactivateDeletedMember(
+		gymId: string,
+		memberId: string,
+		data: OnboardMember,
+		image?: string,
+	): Promise<BaseResponse<{ memberId: string }>> {
+		const member = await this.memberRepository.findByIdAndGym(memberId, gymId);
+		if (!member || !member.isDeleted) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "Member not found");
+		}
+
+		// Reuse a still-active membership when one exists so the machine expiry
+		// matches it; otherwise a new plan is required to set a fresh expiry.
+		let activeMembershipId: string | null = null;
+		const current = member.currentMembership;
+		if (current && !current.isDeleted && current.endDate && current.endDate > new Date()) {
+			activeMembershipId = current.id;
+		} else {
+			const latest = await this.memberRepository.findLatestActiveMembership(memberId);
+			if (latest?.endDate) {
+				activeMembershipId = latest.id;
+			}
+		}
+
+		let membershipPackage;
+		if (!activeMembershipId) {
+			if (!data.packageId || !data.membershipStartDate) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"This member was previously deleted and has no active membership. Select a membership plan to set a new expiry date.",
+				);
+			}
+			membershipPackage = await this.gymRepository.getMembershipPackage(gymId, data.packageId);
+			if (!membershipPackage) {
+				throw new MemberError(MemberErrorCode.BAD_REQUEST, "Plan with planId doesnt exists");
+			}
+		}
+
+		const restored = await this.memberRepository.restoreDeletedMember(
+			memberId,
+			gymId,
+			data,
+			activeMembershipId,
+			membershipPackage,
+			image,
+		);
+
+		if (data.isMachine && data.serialNumbers?.length) {
+			const expiryDate = restored.currentMembership?.endDate;
+			if (!expiryDate) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"The membership end date could not be determined for biometric expiry setup.",
+				);
+			}
+			await this.machineRepository.addUser({
+				memberName: restored.name,
+				biometricCode: restored.membershipCode,
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				serialNumbers: data.serialNumbers,
+				cardNumber: data.cardNumber,
+				IsBioPasswordUpload: data.IsBioPasswordUpload ?? false,
+				IsCardUpload: data.IsCardUpload ?? false,
+				IsFaceUpload: data.IsFaceUpload ?? false,
+				IsFPUpload: data.IsFPUpload ?? false,
+			});
+			const expiryWasSet = await this.machineRepository.setUserExpiration({
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				biometricCode: restored.membershipCode,
+				expirationDate: expiryDate,
+				serialNumbers: data.serialNumbers,
+			});
+			if (!expiryWasSet) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"The member was restored and added to the biometric device, but its expiry date could not be set. Check the device connection and retry.",
+				);
+			}
+		}
+
+		this.logger.debug("reactivateDeletedMember: success", { memberId: restored.id });
+		return {
+			message: activeMembershipId
+				? "Member restored with their existing active membership"
+				: "Member restored with a new membership",
+			success: true,
+			data: { memberId: restored.id },
 		};
 	}
 	async pushToMachine(
@@ -602,36 +702,244 @@ export class MemberService {
 	}
 	async deleteMemberMembership(
 		memberId: string,
+		gymId: string,
 		membershipId: string,
-		data: MachineData,
+		_user: AuthenticatedUser,
 	): Promise<BaseResponse<null>> {
+		const member = await this.memberRepository.findByIdAndGym(memberId, gymId);
+		if (!member || member.isDeleted) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "Member not found");
+		}
+
 		const membership = await this.memberRepository.getMembership(membershipId);
-		if (!membership) {
-			throw new MemberError(
-				MemberErrorCode.BAD_REQUEST,
-				"no membership with provided predicessor id found",
-			);
+		if (!membership || membership.isDeleted || membership.member.id !== memberId) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "Membership not found for this member");
 		}
 		if (membership.successorId) {
-			return {
-				message: "membership has a successor delete successor first",
-				success: false,
-				data: null,
-			};
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"This membership has a newer renewal linked to it. Delete the latest membership first.",
+			);
 		}
-		const endDate = await this.memberRepository.deleteMemberMembership(memberId, membershipId);
-		if (data.isMachine && data.serialNumber && endDate) {
-			await this.machineRepository.setUserExpiration({
+
+		// Soft-deletes and restores the previous membership as current.
+		const restoredEndDate = await this.memberRepository.deleteMemberMembership(
+			memberId,
+			membershipId,
+		);
+
+		const serialNumbers = this.memberSerialNumbers(member);
+		if (serialNumbers.length > 0) {
+			// No membership left at all: block entry by expiring the device user.
+			const machineExpiry = restoredEndDate ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
+			const expiryWasSet = await this.machineRepository.setUserExpiration({
 				apiKey: env.MACHINE_SERVER_API_KEY,
-				biometricCode: membership.member.membershipCode,
-				expirationDate: endDate,
-				serialNumbers: data.serialNumber,
+				biometricCode: member.membershipCode,
+				expirationDate: machineExpiry,
+				serialNumbers,
 			});
+			if (!expiryWasSet) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"The membership was deleted, but the expiry date could not be updated on the biometric device. Check the device connection and retry.",
+				);
+			}
 		}
 		return {
-			message: "memberships deleted successfully",
+			message: "Membership deleted successfully",
 			success: true,
+			data: null,
 		};
+	}
+
+	async restrictMemberEntry(
+		memberId: string,
+		gymId: string,
+		block: boolean,
+		_user: AuthenticatedUser,
+	): Promise<BaseResponse<null>> {
+		const member = await this.memberRepository.findByIdAndGym(memberId, gymId);
+		if (!member || member.isDeleted) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "Member not found");
+		}
+
+		const serialNumbers = this.memberSerialNumbers(member);
+		if (serialNumbers.length === 0) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"This member is not assigned to any biometric device.",
+			);
+		}
+
+		let expiry: Date;
+		if (block) {
+			// Past date blocks entry at the machine.
+			expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);
+		} else {
+			const membershipEndDate = member.currentMembership?.endDate;
+			if (!membershipEndDate || membershipEndDate <= new Date()) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"This member has no active membership. Renew the membership before allowing entry.",
+				);
+			}
+			expiry = membershipEndDate;
+		}
+
+		const expiryWasSet = await this.machineRepository.setUserExpiration({
+			apiKey: env.MACHINE_SERVER_API_KEY,
+			biometricCode: member.membershipCode,
+			expirationDate: expiry,
+			serialNumbers,
+		});
+		if (!expiryWasSet) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"The device expiry could not be updated. Check the device connection and try again.",
+			);
+		}
+
+		await this.memberRepository.updateStatus(memberId, block ? "INACTIVE" : "ACTIVE");
+
+		return {
+			message: block ? "Member entry restricted" : "Member entry allowed",
+			success: true,
+			data: null,
+		};
+	}
+
+	async pauseMembership(
+		memberId: string,
+		gymId: string,
+		days: number,
+		_user: AuthenticatedUser,
+	): Promise<BaseResponse<null>> {
+		const member = await this.memberRepository.findByIdAndGym(memberId, gymId);
+		if (!member || member.isDeleted) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "Member not found");
+		}
+
+		const membership = member.currentMembership;
+		if (!membership || membership.isDeleted || !membership.endDate) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"This member has no active membership to pause.",
+			);
+		}
+		if (membership.isPaused) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"This membership is already paused. Resume it before pausing again.",
+			);
+		}
+		if (membership.endDate <= new Date()) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"This membership has already expired. Renew it instead of pausing.",
+			);
+		}
+
+		const newEndDate = new Date(membership.endDate);
+		newEndDate.setDate(newEndDate.getDate() + days);
+
+		await this.memberRepository.pauseMembership(membership.id, newEndDate, days);
+
+		const serialNumbers = this.memberSerialNumbers(member);
+		if (serialNumbers.length > 0) {
+			const expiryWasSet = await this.machineRepository.setUserExpiration({
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				biometricCode: member.membershipCode,
+				expirationDate: newEndDate,
+				serialNumbers,
+			});
+			if (!expiryWasSet) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"The membership was paused, but the new expiry date could not be set on the biometric device. Check the device connection and resume/pause again to retry.",
+				);
+			}
+		}
+
+		return {
+			message: `Membership paused for ${days} day${days === 1 ? "" : "s"}`,
+			success: true,
+			data: null,
+		};
+	}
+
+	async resumeMembership(
+		memberId: string,
+		gymId: string,
+		_user: AuthenticatedUser,
+	): Promise<BaseResponse<null>> {
+		const member = await this.memberRepository.findByIdAndGym(memberId, gymId);
+		if (!member || member.isDeleted) {
+			throw new MemberError(MemberErrorCode.NOT_FOUND, "Member not found");
+		}
+
+		const membership = member.currentMembership;
+		if (!membership || membership.isDeleted || !membership.endDate) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"This member has no active membership to resume.",
+			);
+		}
+		if (!membership.isPaused || !membership.pausedAt) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"This membership is not paused.",
+			);
+		}
+
+		// Whole days elapsed since the pause started.
+		const elapsedDays = Math.floor(
+			(Date.now() - membership.pausedAt.getTime()) / (24 * 60 * 60 * 1000),
+		);
+		// Days that were added to the expiry but not actually used by the pause.
+		const unusedDays = Math.min(
+			membership.pausedDays,
+			Math.max(0, membership.pausedDays - elapsedDays),
+		);
+
+		const newEndDate = new Date(membership.endDate);
+		newEndDate.setDate(newEndDate.getDate() - unusedDays);
+
+		// Guard: resuming must never push the expiry beyond pause-time state or
+		// before the membership start date.
+		if (newEndDate < membership.startDate) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"The membership dates are inconsistent. Please renew the membership instead.",
+			);
+		}
+
+		await this.memberRepository.resumeMembership(membership.id, newEndDate);
+
+		const serialNumbers = this.memberSerialNumbers(member);
+		if (serialNumbers.length > 0) {
+			const expiryWasSet = await this.machineRepository.setUserExpiration({
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				biometricCode: member.membershipCode,
+				expirationDate: newEndDate,
+				serialNumbers,
+			});
+			if (!expiryWasSet) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					"The membership was resumed, but the expiry date could not be updated on the biometric device. Check the device connection and try again.",
+				);
+			}
+		}
+
+		return {
+			message: "Membership resumed",
+			success: true,
+			data: null,
+		};
+	}
+
+	private memberSerialNumbers(member: MemberWithDetails): string[] {
+		return member.memberMachines.map((mm) => mm.machine.serialNumber);
 	}
 	//   async bulkOnboardExcelMembers(
 	//     gymId: string,

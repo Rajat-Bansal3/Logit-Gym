@@ -8,7 +8,9 @@ import {
 	markAttendanceSchema,
 	memberToMachineSchema,
 	onboardMemberSchema,
+	pauseMembershipSchema,
 	reportQuerySchema,
+	restrictEntrySchema,
 	updateMemberSchema,
 } from "../../shared/types/member.types";
 import { createMembershipSchema } from "../../shared/types/payment.types";
@@ -490,6 +492,85 @@ export class MemberController {
 			res.status(200).json(membership);
 		} catch (error) {
 			this.logger.error("getMemberMembership req errored", error);
+			next(error);
+		}
+	};
+
+	deleteMembership = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			const { memberId, membershipId } = req.params;
+			if (
+				!user?.gymId ||
+				!memberId ||
+				Array.isArray(memberId) ||
+				!membershipId ||
+				Array.isArray(membershipId)
+			) {
+				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId or membershipId not found");
+			}
+			const result = await this.memberService.deleteMemberMembership(
+				memberId,
+				user.gymId,
+				membershipId,
+				user,
+			);
+			res.status(200).json(result);
+		} catch (error) {
+			next(error);
+		}
+	};
+
+	restrictEntry = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			const memberId = req.params.memberId;
+			if (!user?.gymId || !memberId || Array.isArray(memberId)) {
+				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
+			}
+			const data = restrictEntrySchema.parse(req.body);
+			const result = await this.memberService.restrictMemberEntry(
+				memberId,
+				user.gymId,
+				data.block,
+				user,
+			);
+			res.status(200).json(result);
+		} catch (error) {
+			next(error);
+		}
+	};
+
+	pauseMembership = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			const memberId = req.params.memberId;
+			if (!user?.gymId || !memberId || Array.isArray(memberId)) {
+				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
+			}
+			const data = pauseMembershipSchema.parse(req.body);
+			const result = await this.memberService.pauseMembership(
+				memberId,
+				user.gymId,
+				data.days,
+				user,
+			);
+			res.status(200).json(result);
+		} catch (error) {
+			next(error);
+		}
+	};
+
+	resumeMembership = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			const memberId = req.params.memberId;
+			if (!user?.gymId || !memberId || Array.isArray(memberId)) {
+				throw new MemberError(MemberErrorCode.BAD_REQUEST, "memberId not found");
+			}
+			const result = await this.memberService.resumeMembership(memberId, user.gymId, user);
+			res.status(200).json(result);
+		} catch (error) {
 			next(error);
 		}
 	};

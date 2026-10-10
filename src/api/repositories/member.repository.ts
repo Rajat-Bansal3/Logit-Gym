@@ -1,7 +1,9 @@
 import {
 	type AttendanceLog,
 	CheckInType,
+	type Machines,
 	type Member,
+	type MemberMachine,
 	type MemberMetrics,
 	type MemberStatus,
 	type Membership,
@@ -31,6 +33,7 @@ import { AuthService } from "../services/auth.service";
 export type MemberWithDetails = Member & {
 	currentMembership: (Membership & { package: Package }) | null;
 	memberMetrics: MemberMetrics | null;
+	memberMachines: (MemberMachine & { machine: Machines })[];
 };
 
 export type MemberListResult = {
@@ -298,10 +301,11 @@ export class MemberRepository {
 		membershipPackage: Package,
 		image?: string,
 	): Promise<MemberWithDetails> {
-		const endDate = computeMembershipEndDate(
-			input.membershipStartDate,
-			membershipPackage.days ?? 730,
-		);
+		const startDate = input.membershipStartDate;
+		if (!startDate) {
+			throw new MemberError(MemberErrorCode.BAD_REQUEST, "Membership start date is required");
+		}
+		const endDate = computeMembershipEndDate(startDate, membershipPackage.days ?? 730);
 
 		return this.prisma.$transaction(
 			async (tx) => {
@@ -361,7 +365,7 @@ export class MemberRepository {
 				const membership = await tx.membership.create({
 					data: {
 						memberId: member.id,
-						startDate: input.membershipStartDate,
+						startDate,
 						endDate,
 						isActive: true,
 						packageId: membershipPackage.id,
@@ -1027,28 +1031,191 @@ export class MemberRepository {
 		return newMembership;
 	}
 	async deleteMemberMembership(memberId: string, membershipId: string) {
-		await this.prisma.membership.update({
-			where: {
-				id: membershipId,
-			},
+		return this.prisma.$transaction(async (tx) => {
+			await tx.membership.update({
+				where: {
+					id: membershipId,
+				},
+				data: {
+					isDeleted: true,
+					isActive: false,
+				},
+			});
+
+			const member = await tx.member.findUnique({
+				where: { id: memberId },
+				select: { currentMembershipId: true },
+			});
+
+			// Restore the latest remaining membership as "current" when the
+			// deleted one was the current membership. This also drives the
+			// expiry date that gets synced back to the machine.
+			const latest = await tx.membership.findFirst({
+				where: {
+					memberId,
+					isDeleted: false,
+				},
+				orderBy: {
+					endDate: "desc",
+				},
+				select: {
+					id: true,
+					endDate: true,
+				},
+			});
+
+			if (member?.currentMembershipId === membershipId) {
+				await tx.member.update({
+					where: { id: memberId },
+					data: { currentMembershipId: latest?.id ?? null },
+				});
+			}
+
+			return latest?.endDate ?? null;
+		});
+	}
+
+	async pauseMembership(membershipId: string, newEndDate: Date, days: number) {
+		return this.prisma.membership.update({
+			where: { id: membershipId },
 			data: {
-				isDeleted: true,
+				isPaused: true,
+				pausedAt: new Date(),
+				pausedDays: days,
+				endDate: newEndDate,
 			},
 		});
-		const endDate = await this.prisma.membership.findMany({
+	}
+
+	async findLatestActiveMembership(memberId: string): Promise<Membership | null> {
+		return this.prisma.membership.findFirst({
 			where: {
 				memberId,
 				isDeleted: false,
+				endDate: { gt: new Date() },
 			},
-			orderBy: {
-				endDate: "desc",
+			orderBy: { endDate: "desc" },
+		});
+	}
+
+	async restoreDeletedMember(
+		memberId: string,
+		gymId: string,
+		input: OnboardMember,
+		activeMembershipId: string | null,
+		membershipPackage?: Package,
+		image?: string,
+	): Promise<MemberWithDetails> {
+		return this.prisma.$transaction(
+			async (tx) => {
+				await tx.member.update({
+					where: { id: memberId },
+					data: {
+						name: input.name,
+						phone: input.phone,
+						gender: input.gender,
+						...(input.address && { address: input.address }),
+						...(input.dateOfBirth !== undefined && {
+							dateOfBirth: input.dateOfBirth,
+							age: computeAge(input.dateOfBirth),
+						}),
+						...(input.email !== undefined && { email: input.email }),
+						...(input.emergencyContact !== undefined && {
+							emergencyContact: input.emergencyContact,
+						}),
+						...(input.weight !== undefined && { weight: input.weight }),
+						...(input.height !== undefined && { height: input.height }),
+						...(image !== undefined && { avatarUrl: image }),
+						isDeleted: false,
+						status: "ACTIVE",
+					},
+				});
+
+				// Re-link machine assignments without creating duplicate join rows.
+				await tx.memberMachine.deleteMany({ where: { memberId } });
+				if (input.isMachine && input.serialNumbers && input.serialNumbers.length > 0) {
+					const machines = await tx.machines.findMany({
+						where: {
+							serialNumber: { in: input.serialNumbers },
+							gymId,
+						},
+						select: { id: true },
+					});
+					await tx.memberMachine.createMany({
+						data: machines.map((machine) => ({
+							memberId,
+							machineId: machine.id,
+						})),
+					});
+				}
+
+				if (membershipPackage) {
+					const startDate = input.membershipStartDate;
+					if (!startDate) {
+						throw new MemberError(
+							MemberErrorCode.BAD_REQUEST,
+							"Membership start date is required",
+						);
+					}
+					const membership = await tx.membership.create({
+						data: {
+							memberId,
+							startDate,
+							endDate: computeMembershipEndDate(startDate, membershipPackage.days ?? 730),
+							isActive: true,
+							packageId: membershipPackage.id,
+						},
+					});
+					await tx.payment.create({
+						data: {
+							amount: membershipPackage.amount,
+							gymId,
+							memberId,
+							membershipId: membership.id,
+							category: "Membership",
+							paidDate: new Date(),
+							type: "CREDIT",
+						},
+					});
+					await tx.gymMetrics.update({
+						where: { gymId },
+						data: { totalRevenue: { increment: membershipPackage.amount } },
+					});
+					await tx.memberMetrics.upsert({
+						where: { memberId },
+						create: { memberId, paymentStatus: "PAID" },
+						update: { paymentStatus: "PAID" },
+					});
+					await tx.member.update({
+						where: { id: memberId },
+						data: { currentMembershipId: membership.id },
+					});
+				} else if (activeMembershipId) {
+					await tx.member.update({
+						where: { id: memberId },
+						data: { currentMembershipId: activeMembershipId },
+					});
+				}
+
+				return tx.member.findUniqueOrThrow({
+					where: { id: memberId },
+					include: memberWithDetails,
+				});
 			},
-			take: 1,
-			select: {
-				endDate: true,
+			{ timeout: 10000, maxWait: 10000 },
+		);
+	}
+
+	async resumeMembership(membershipId: string, newEndDate: Date) {
+		return this.prisma.membership.update({
+			where: { id: membershipId },
+			data: {
+				isPaused: false,
+				pausedAt: null,
+				pausedDays: 0,
+				endDate: newEndDate,
 			},
 		});
-		return endDate[0]?.endDate;
 	}
 	async createMemberMachines(machineId: string[], memberId: string) {
 		return await Promise.all(

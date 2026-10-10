@@ -40,8 +40,10 @@ export const onboardMemberSchema = z.object({
 	weight: z.coerce.number().positive().optional(),
 	height: z.coerce.number().positive().optional(),
 
-	membershipStartDate: z.coerce.date(),
-	packageId: z.string(),
+	// Optional when re-adding a previously deleted member who still has an
+	// active membership; required for fresh onboarding (enforced in the service).
+	membershipStartDate: z.coerce.date().optional(),
+	packageId: z.string().optional(),
 	isMachine: multipartBoolean.default(false),
 	serialNumbers: multipartStringArray.optional(),
 	cardNumber: z.string().optional(),
@@ -93,6 +95,14 @@ export const deleteMemberSchema = z.object({
 	isMachine: z.boolean(),
 });
 
+export const restrictEntrySchema = z.object({
+	block: z.boolean(),
+});
+
+export const pauseMembershipSchema = z.object({
+	days: z.coerce.number().int().min(1).max(365),
+});
+
 export const listMembersQuerySchema = z.object({
 	status: z.enum(MemberStatus).optional(),
 	serialNumber: z.string().min(1).max(100).optional(),
@@ -120,6 +130,8 @@ export const machineFetchedMembers = z.array(z.number());
 export type OnboardMember = z.infer<typeof onboardMemberSchema>;
 export type MemberToMachine = z.infer<typeof memberToMachineSchema>;
 export type UpdateMember = z.infer<typeof updateMemberSchema>;
+export type RestrictEntry = z.infer<typeof restrictEntrySchema>;
+export type PauseMembership = z.infer<typeof pauseMembershipSchema>;
 export type ListMembersQuery = z.infer<typeof listMembersQuerySchema>;
 export type MarkAttendance = z.infer<typeof markAttendanceSchema>;
 export type ReportQuery = z.infer<typeof reportQuerySchema>;

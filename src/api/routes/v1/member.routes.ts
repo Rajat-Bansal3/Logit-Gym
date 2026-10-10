@@ -53,4 +53,24 @@ router.get("/:memberId/membership", controller.getMemberMembership);
 
 router.post("/:memberId/membership", roleMiddleware("OWNER"), controller.createMembership);
 
+router.delete(
+	"/:memberId/membership/:membershipId",
+	roleMiddleware("OWNER"),
+	controller.deleteMembership,
+);
+
+router.post("/:memberId/restrict-entry", roleMiddleware("OWNER"), controller.restrictEntry);
+
+router.post(
+	"/:memberId/membership/pause",
+	roleMiddleware("OWNER"),
+	controller.pauseMembership,
+);
+
+router.post(
+	"/:memberId/membership/resume",
+	roleMiddleware("OWNER"),
+	controller.resumeMembership,
+);
+
 export default router;
