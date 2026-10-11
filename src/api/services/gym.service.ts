@@ -323,6 +323,9 @@ export class GymService {
 			case "subscription.pending":
 				await this.handleSubscriptionPending(payload.subscription.entity);
 				break;
+			case "subscription.completed":
+				await this.handleSubscriptionCompleted(payload.subscription.entity);
+				break;
 		}
 	};
 	syncAttendance = async (syncData: SyncData): Promise<BaseResponse<number>> => {
@@ -463,26 +466,92 @@ export class GymService {
 		});
 	};
 
+	// private handleSubscriptionHalted = async (subscription: any): Promise<void> => {
+	// 	await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+	// 		status: "ACTIVE",
+	// 		renue_status: "CANCELLED",
+	// 		gracePeriodEnd: new Date(Date.now() + 5 * 86_400_000),
+	// 	});
+	// };
+
+	// private handleSubscriptionCancelled = async (subscription: any): Promise<void> => {
+	// 	await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+	// 		status: "ACTIVE",
+	// 		renue_status: "CANCELLED",
+	// 	});
+	// };
+
+	// private handleSubscriptionPending = async (subscription: any): Promise<void> => {
+	// 	await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+	// 		status: "PENDING",
+	// 		renue_status: "PENDING",
+	// 	});
+	// };
 	private handleSubscriptionHalted = async (subscription: any): Promise<void> => {
+		// retries exhausted: mark expired, but keep a 5-day grace so the owner can fix payment
 		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
-			status: "ACTIVE",
+			status: "EXPIRED",
 			renue_status: "CANCELLED",
 			gracePeriodEnd: new Date(Date.now() + 5 * 86_400_000),
 		});
 	};
 
 	private handleSubscriptionCancelled = async (subscription: any): Promise<void> => {
-		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
-			status: "ACTIVE",
-			renue_status: "CANCELLED",
-		});
+		const sub = await this.planRepository.findByGatewayId(subscription.id);
+		if (!sub) return;
+
+		if (sub.status === "ACTIVE") {
+			// was paid: keep access until the period they paid for ends, stop renewals
+			await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+				renue_status: "CANCELLED",
+				cancelAtPeriodEnd: true,
+			});
+		} else {
+			// never paid (abandoned checkout or already ended): just close the draft
+			await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+				status: "EXPIRED",
+				renue_status: "CANCELLED",
+			});
+		}
 	};
 
 	private handleSubscriptionPending = async (subscription: any): Promise<void> => {
-		await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
-			status: "PENDING",
-			renue_status: "PENDING",
-		});
+		const sub = await this.planRepository.findByGatewayId(subscription.id);
+		if (!sub) return;
+
+		if (sub.status === "ACTIVE") {
+			// renewal charge failed, Razorpay is retrying: keep access via grace
+			await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+				renue_status: "PENDING",
+				gracePeriodEnd: sub.gracePeriodEnd ?? new Date(Date.now() + 5 * 86_400_000),
+			});
+		} else {
+			// first payment never completed: stays a draft, doesn't touch the gym
+			await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+				renue_status: "PENDING",
+			});
+		}
+	};
+
+	private handleSubscriptionCompleted = async (subscription: any): Promise<void> => {
+		const sub = await this.planRepository.findByGatewayId(subscription.id);
+		if (!sub) return;
+
+		const periodEnd = new Date(subscription.current_end * 1000);
+
+		if (periodEnd > new Date()) {
+			// all cycles charged, but the owner still has paid time left:
+			// keep access, just record that it won't renew
+			await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+				renue_status: "CANCELLED",
+				cancelAtPeriodEnd: true,
+			});
+		} else {
+			await this.planRepository.updateSubscription(subscription.id, subscription.notes.gymId, {
+				status: "EXPIRED",
+				renue_status: "CANCELLED",
+			});
+		}
 	};
 
 	//private methods

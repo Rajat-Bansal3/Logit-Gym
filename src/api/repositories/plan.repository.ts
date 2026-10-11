@@ -27,6 +27,10 @@ export class PlanRepository {
 	constructor(prisma: PrismaClient) {
 		this.prisma = prisma;
 	}
+	findByGatewayId = async (gatewaySubscriptionId: string) => {
+		return this.prisma.subscription.findUnique({ where: { gatewaySubscriptionId } });
+	};
+
 	getPlan = async (planId: string): Promise<Plan | null> => {
 		return await this.prisma.plan.findUnique({
 			where: {
@@ -66,21 +70,64 @@ export class PlanRepository {
 		});
 		return gym_with_sub;
 	};
+	// createSub = async (
+	// 	gymId: string,
+	// 	planId: string,
+	// 	gatewaySubscriptionId: string,
+	// 	plan: Plan,
+	// ): Promise<Subscription> => {
+	// 	const currentPeriodStart = new Date();
+	// 	const currentPeriodEnd = computePeriodEnd(currentPeriodStart, plan.billingCycle);
+
+	// 	return await this.prisma.$transaction(async (tx) => {
+	// 		const sub = await tx.subscription.create({
+	// 			data: {
+	// 				gymId,
+	// 				planId,
+	// 				status: plan.billingCycle === "TRIAL" ? "TRIALING" : "PENDING",
+	// 				currentPeriodStart,
+	// 				currentPeriodEnd,
+	// 				cancelAtPeriodEnd: false,
+	// 				gatewaySubscriptionId,
+	// 			},
+	// 		});
+
+	// 		await tx.gym.update({
+	// 			where: { id: gymId },
+	// 			data: {
+	// 				currentSubscriptionId: sub.id,
+	// 				subscriptionStatus: plan.billingCycle === "TRIAL" ? "TRIALING" : "PENDING",
+	// 			},
+	// 		});
+
+	// 		return sub;
+	// 	});
+	// };
+
 	createSub = async (
 		gymId: string,
 		planId: string,
 		gatewaySubscriptionId: string,
 		plan: Plan,
 	): Promise<Subscription> => {
+		const isTrial = plan.billingCycle === "TRIAL";
 		const currentPeriodStart = new Date();
 		const currentPeriodEnd = computePeriodEnd(currentPeriodStart, plan.billingCycle);
 
 		return await this.prisma.$transaction(async (tx) => {
+			if (!isTrial) {
+				// earlier abandoned checkouts are dead drafts
+				await tx.subscription.updateMany({
+					where: { gymId, status: "PENDING" },
+					data: { status: "EXPIRED" },
+				});
+			}
+
 			const sub = await tx.subscription.create({
 				data: {
 					gymId,
 					planId,
-					status: plan.billingCycle === "TRIAL" ? "TRIALING" : "PENDING",
+					status: isTrial ? "TRIALING" : "PENDING",
 					currentPeriodStart,
 					currentPeriodEnd,
 					cancelAtPeriodEnd: false,
@@ -88,13 +135,14 @@ export class PlanRepository {
 				},
 			});
 
-			await tx.gym.update({
-				where: { id: gymId },
-				data: {
-					currentSubscriptionId: sub.id,
-					subscriptionStatus: plan.billingCycle === "TRIAL" ? "TRIALING" : "PENDING",
-				},
-			});
+			// Only a trial takes effect immediately. A paid plan becomes current
+			// when the payment webhook confirms it.
+			if (isTrial) {
+				await tx.gym.update({
+					where: { id: gymId },
+					data: { currentSubscriptionId: sub.id, subscriptionStatus: "TRIALING" },
+				});
+			}
 
 			return sub;
 		});
@@ -119,18 +167,54 @@ export class PlanRepository {
 			currentPeriodEnd: Date;
 			gracePeriodEnd: Date | null;
 			renue_status: SubscriptionStatus;
+			cancelAtPeriodEnd: boolean;
 		}>,
 	) => {
+		// return this.prisma.$transaction(async (tx) => {
+		// 	const sub = await tx.subscription.update({
+		// 		where: { gatewaySubscriptionId },
+		// 		data,
+		// 	});
+
+		// 	await tx.gym.update({
+		// 		where: { id: gymId },
+		// 		data: { ...(data.status && { subscriptionStatus: data.status }) },
+		// 	});
+
+		// 	return sub;
+		// });
 		return this.prisma.$transaction(async (tx) => {
 			const sub = await tx.subscription.update({
 				where: { gatewaySubscriptionId },
 				data,
 			});
 
-			await tx.gym.update({
-				where: { id: gymId },
-				data: { ...(data.status && { subscriptionStatus: data.status }) },
-			});
+			if (data.status) {
+				const gym = await tx.gym.findUnique({
+					where: { id: gymId },
+					select: { currentSubscriptionId: true },
+				});
+
+				if (data.status === "ACTIVE") {
+					// retire the previous current sub (e.g. the trial) so it can't linger
+					if (gym?.currentSubscriptionId && gym.currentSubscriptionId !== sub.id) {
+						await tx.subscription.update({
+							where: { id: gym.currentSubscriptionId },
+							data: { status: "CANCELLED" },
+						});
+					}
+					await tx.gym.update({
+						where: { id: gymId },
+						data: { currentSubscriptionId: sub.id, subscriptionStatus: "ACTIVE" },
+					});
+				} else if (gym?.currentSubscriptionId === sub.id) {
+					await tx.gym.update({
+						where: { id: gymId },
+						data: { subscriptionStatus: data.status },
+					});
+				}
+				// else: a non-current (abandoned) sub got an event, so leave the gym alone
+			}
 
 			return sub;
 		});
@@ -173,10 +257,31 @@ export class PlanRepository {
 				},
 			});
 
+			// this is added to retire the previous current subscription if it exists
+
+			const gym = await tx.gym.findUnique({
+				where: { id: data.gymId },
+				select: { currentSubscriptionId: true },
+			});
+
+			// retire the previous current sub (e.g. the trial)
+			if (gym?.currentSubscriptionId && gym.currentSubscriptionId !== sub.id) {
+				await tx.subscription.update({
+					where: { id: gym.currentSubscriptionId },
+					data: { status: "CANCELLED" },
+				});
+			}
+
+			// set the new subscription as the current subscription for the gym
 			await tx.gym.update({
 				where: { id: data.gymId },
-				data: { subscriptionStatus: "ACTIVE" },
+				data: { currentSubscriptionId: sub.id, subscriptionStatus: "ACTIVE" },
 			});
+
+			// await tx.gym.update({
+			// 	where: { id: data.gymId },
+			// 	data: { subscriptionStatus: "ACTIVE" },
+			// });
 		});
 	};
 }
