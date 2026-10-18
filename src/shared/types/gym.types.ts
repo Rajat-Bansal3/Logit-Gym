@@ -82,6 +82,11 @@ export const addMachineSchema = z.object({
 	serialNumber: z.string().min(1).max(100),
 	machineName: z.string().min(1).max(100),
 });
+export const deviceCommandsQuerySchema = z.object({
+	serialNumber: z.string().min(1).max(100),
+	fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "fromDate must be yyyy-MM-dd"),
+	toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "toDate must be yyyy-MM-dd"),
+});
 export const getPresignedUrlsSchema = z.object({
 	id: z.string(),
 	mimeType: z.string(),
@@ -153,5 +158,6 @@ export type CreateGym = z.infer<typeof createGymSchema>;
 export type AddMachine = z.infer<typeof addMachineSchema>;
 export type CreateSubscription = z.infer<typeof createSubscriptionSchema>;
 export type SyncData = z.infer<typeof syncDataSchema>;
+export type DeviceCommandsQuery = z.infer<typeof deviceCommandsQuerySchema>;
 export type bulkAdd = z.infer<typeof bulkAddSchema>;
 export type bulkAddMembers = z.infer<typeof bulkMembersSchema>;

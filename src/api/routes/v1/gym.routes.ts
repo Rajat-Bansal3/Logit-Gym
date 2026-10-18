@@ -65,6 +65,8 @@ router.put(
 
 router.delete("/delete-machine", roleMiddleware("OWNER"), catchAsync(gymController.removeMachine));
 
+router.get("/device-commands", roleMiddleware("OWNER"), catchAsync(gymController.getDeviceCommands));
+
 /**
  * Delete a gym
  */

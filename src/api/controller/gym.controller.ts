@@ -9,6 +9,7 @@ import {
 	createMembershipPackageSchema,
 	createPlanSchema,
 	createSubscriptionSchema,
+	deviceCommandsQuerySchema,
 	getPresignedUrlsSchema,
 	syncDataSchema,
 	updateGymSchema,
@@ -160,6 +161,24 @@ export class GymController {
 			return res.status(200).json(resp);
 		} catch (error) {
 			this.logger.error("remove machine: error", {
+				gymId: req.user?.gymId,
+				error,
+			});
+			next(error);
+			return;
+		}
+	};
+	getDeviceCommands = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
+			}
+			const data = deviceCommandsQuerySchema.parse(req.query);
+			const resp = await this.gymService.getDeviceCommands(user.gymId, data);
+			return res.status(200).json(resp);
+		} catch (error) {
+			this.logger.error("get device commands: error", {
 				gymId: req.user?.gymId,
 				error,
 			});

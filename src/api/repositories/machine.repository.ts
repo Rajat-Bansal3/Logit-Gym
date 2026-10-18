@@ -251,6 +251,43 @@ export class MachineRepository {
 			logDate: log.LogDate,
 		}));
 	}
+
+	async getDeviceCommands({
+		apiKey,
+		serialNumber,
+		fromDate,
+		toDate,
+	}: {
+		apiKey: string;
+		serialNumber: string;
+		fromDate: string;
+		toDate: string;
+	}): Promise<any[]> {
+		try {
+			const results = await axios.get(`${env.MACHINE_SERVER}/GetDeviceCommands`, {
+				params: {
+					APIKey: String(apiKey),
+					FromDate: String(fromDate),
+					ToDate: String(toDate),
+					SerialNumbers: String(serialNumber),
+				},
+				timeout: 10000,
+			});
+			const records = results.data?.records;
+			return Array.isArray(records) ? records : [];
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				if (!error.response) {
+					throw new MachineError(MachineErrorCode.API_UNREACHABLE);
+				}
+				if (error.response.status < 500) {
+					throw new MachineError(MachineErrorCode.API_REJECTED);
+				}
+				throw new MachineError(MachineErrorCode.API_SERVER_ERROR);
+			}
+			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
+		}
+	}
 	async getMachines(gymId: string, serialNumbers: string[]) {
 		return await this.prisma.machines.findMany({
 			where: {

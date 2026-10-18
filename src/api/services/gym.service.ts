@@ -12,6 +12,7 @@ import type {
 	CreatePlanInput,
 	CreateSubscription,
 	createMembershipPackageInput,
+	DeviceCommandsQuery,
 	SyncData,
 	UpdateGym,
 	updateMembershipPackageInput,
@@ -225,6 +226,28 @@ export class GymService {
 		return {
 			message: resp,
 			success: true,
+		};
+	}
+
+	async getDeviceCommands(
+		gymId: string,
+		query: DeviceCommandsQuery,
+	): Promise<BaseResponse<any[]>> {
+		// Safety: only proxy commands for machines that belong to this gym.
+		const machines = await this.machineRepository.getMachines(gymId, [query.serialNumber]);
+		if (machines.length === 0) {
+			throw new GymError(GymErrorCode.NOT_FOUND, "Machine not found for this gym");
+		}
+		const records = await this.machineRepository.getDeviceCommands({
+			apiKey: env.MACHINE_SERVER_API_KEY,
+			serialNumber: query.serialNumber,
+			fromDate: query.fromDate,
+			toDate: query.toDate,
+		});
+		return {
+			message: "commands fetched successfully",
+			success: true,
+			data: records,
 		};
 	}
 	generatePresignedUrl = async ({
