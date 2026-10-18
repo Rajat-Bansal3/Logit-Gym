@@ -17,6 +17,8 @@ router.get("/gym", roleMiddleware("MEMBER"), memberController.getMemberGym);
 
 router.get("/payments", roleMiddleware("MEMBER"), memberController.getMemberPayments);
 
+router.get("/purchases", roleMiddleware("MEMBER"), memberController.getMemberPurchases);
+
 router.get("/profile", roleMiddleware("MEMBER"), memberController.profile);
 
 router.get("/dashboard", roleMiddleware("MEMBER"), memberController.getMemberDashboard);

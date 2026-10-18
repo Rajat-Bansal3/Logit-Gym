@@ -19,6 +19,7 @@ import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { BulkRepository } from "../repositories/bulk.repository";
 import { GymRepository } from "../repositories/gym.repository";
+import { InventoryRepository } from "../repositories/inventory.repository";
 import { MachineRepository } from "../repositories/machine.repository";
 import {
 	type AttendanceReport,
@@ -37,6 +38,7 @@ export class MemberService {
 	private readonly memberRepository: MemberRepository;
 	private readonly gymRepository: GymRepository;
 	private readonly machineRepository: MachineRepository;
+	private readonly inventoryRepository: InventoryRepository;
 	private readonly bulkRepository: BulkRepository;
 	private readonly authService: AuthService;
 	private readonly logger: AppLogger;
@@ -45,6 +47,7 @@ export class MemberService {
 		this.memberRepository = new MemberRepository(prisma);
 		this.gymRepository = new GymRepository(prisma);
 		this.bulkRepository = new BulkRepository(prisma);
+		this.inventoryRepository = new InventoryRepository(prisma);
 		this.logger = new AppLogger();
 		this.authService = new AuthService();
 		this.machineRepository = new MachineRepository(prisma);
@@ -579,6 +582,16 @@ export class MemberService {
 			success: true,
 			data: payments,
 		};
+	}
+
+	async getMemberPurchases(userId: string): Promise<BaseResponse<unknown>> {
+		this.logger.debug("getMemberPurchases request received");
+		const member = await this.memberRepository.getMemberByUserId(userId);
+		if (!member) {
+			return { message: "no purchases", success: true, data: [] };
+		}
+		const purchases = await this.inventoryRepository.listMemberSales(member.id);
+		return { message: "purchases fetched", success: true, data: purchases };
 	}
 	async profile(memberId: string): Promise<BaseResponse<MemberIncludingUser>> {
 		this.logger.debug("profile request recieved , memberId is :", memberId);

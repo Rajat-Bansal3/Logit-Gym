@@ -85,6 +85,13 @@ export const AuthenticatedUserSchema = z.object({
 	userId: z.string(),
 });
 export type AuthenticatedUser = z.infer<typeof AuthenticatedUserSchema>;
+
+export const deviceTokenSchema = z.object({
+	token: z.string().min(10),
+	platform: z.string().optional().default("unknown"),
+});
+export type DeviceTokenInput = z.infer<typeof deviceTokenSchema>;
+
 export const changePasswordSchema = z.object({
 	username: z.string().min(1).max(255),
 	oldPassword: z.string(),

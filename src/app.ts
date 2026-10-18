@@ -54,6 +54,7 @@ export const createApp = () => {
 	app.use("/api/v1/auth", require("./api/routes/v1/auth.routes").default);
 	app.use("/api/v1/gym", require("./api/routes/v1/gym.routes").default);
 	app.use("/api/v1/payments", require("./api/routes/v1/payment.routes").default);
+	app.use("/api/v1/inventory", require("./api/routes/v1/inventory.routes").default);
 	app.use("/api/v1/member", require("./api/routes/v1/member-side.routes").default);
 
 	app.use(notFoundHandler);

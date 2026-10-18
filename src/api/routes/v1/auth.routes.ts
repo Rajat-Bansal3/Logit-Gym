@@ -12,5 +12,7 @@ router.post("/register", catchAsync(authController.register));
 router.use(authMiddleware);
 router.get("/me", catchAsync(authController.me));
 router.patch("/change-password/member", roleMiddleware("MEMBER"), authController.changePassword);
+router.post("/device-token", catchAsync(authController.registerDeviceToken));
+router.delete("/device-token", catchAsync(authController.unregisterDeviceToken));
 
 export default router;

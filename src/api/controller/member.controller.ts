@@ -418,6 +418,19 @@ export class MemberController {
 			next(error);
 		}
 	};
+
+	getMemberPurchases = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user) {
+				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+			}
+			const purchases = await this.memberService.getMemberPurchases(user.id);
+			res.status(200).json(purchases);
+		} catch (error) {
+			next(error);
+		}
+	};
 	profile = async (req: Request, res: Response, next: NextFunction) => {
 		try {
 			this.logger.debug("profile request recieved");

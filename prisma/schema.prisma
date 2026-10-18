@@ -18,6 +18,8 @@ model User {
   gym       Gym[]
   member    Member?
 
+  deviceTokens DeviceToken[]
+
   @@index([username])
   @@index([email])
   @@index([role])
@@ -53,6 +55,8 @@ model Gym {
   subscriptions          Subscription[]     @relation("GymSubscriptions")
   transactions           Transaction[]
   weeklyActivities       WeeklyActivity[]
+  products               Product[]
+  sales                  Sale[]
 
   @@unique([isDeleted, ownerId])
   @@map("gyms")
@@ -105,6 +109,7 @@ model Member {
   payments            Payment[]
   transactions        Transaction[]
   weeklyActivities    WeeklyActivity[]
+  sales               Sale[]
 
   @@unique([gymId, membershipCode])
   @@unique([gymId, phone])
@@ -229,10 +234,12 @@ model Payment {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   transactionId String?         @unique
+  saleId        String?         @unique
   gym           Gym             @relation(fields: [gymId], references: [id], onDelete: Cascade)
   member        Member?         @relation(fields: [memberId], references: [id], onDelete: Cascade)
   membership    Membership?     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   transaction   Transaction?    @relation(fields: [transactionId], references: [id])
+  sale          Sale?           @relation(fields: [saleId], references: [id])
 
   @@index([memberId])
   @@index([membershipId])
@@ -486,4 +493,90 @@ enum BillingCycle {
 enum BioPref {
   AUTO
   MANUAL
+}
+
+// ── Inventory ────────────────────────────────────────────────────────────────
+
+model Product {
+  id           String     @id @default(cuid())
+  gymId        String
+  name         String
+  price        Float      @default(0)
+  quantity     Int        @default(0)
+  instructions String?
+  isDeleted    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  gym          Gym        @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  saleItems    SaleItem[]
+
+  @@index([gymId])
+  @@map("products")
+}
+
+model Sale {
+  id            String     @id @default(cuid())
+  gymId         String
+  memberId      String?
+  totalAmount   Float      @default(0)
+  paymentMethod String     @default("CASH")
+  note          String?
+  isDeleted     Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  gym           Gym        @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  member        Member?    @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  items         SaleItem[]
+  payment       Payment?
+
+  @@index([gymId])
+  @@index([memberId])
+  @@map("sales")
+}
+
+model SaleItem {
+  id           String  @id @default(cuid())
+  saleId       String
+  productId    String
+  productName  String
+  quantity     Int     @default(1)
+  priceAtSale  Float   @default(0)
+  instructions String?
+  sale         Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product      Product @relation(fields: [productId], references: [id])
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("sale_items")
+}
+
+// ── Push notifications (FCM) ─────────────────────────────────────────────────
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   @default("unknown")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+// Records every notification we intend to send, so scheduled jobs never
+// re-send the same one and can be audited. Unique natural key dedupes.
+model NotificationLog {
+  id        String   @id @default(cuid())
+  type      String
+  targetKey String
+  title     String
+  body      String
+  sentAt    DateTime @default(now())
+
+  @@unique([type, targetKey])
+  @@index([type])
+  @@index([sentAt])
+  @@map("notification_logs")
 }

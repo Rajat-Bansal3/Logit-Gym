@@ -853,6 +853,13 @@ export class MemberRepository {
 			},
 		});
 	}
+
+	async getMemberByUserId(userId: string) {
+		return this.prisma.member.findUnique({
+			where: { userId },
+			select: { id: true },
+		});
+	}
 	async profile(memberId: string): Promise<MemberIncludingUser | null> {
 		return await this.prisma.member.findUnique({
 			where: {

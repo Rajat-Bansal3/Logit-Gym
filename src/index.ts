@@ -4,6 +4,7 @@ config();
 
 import { createApp } from "./app";
 import { env } from "./env";
+import { startNotificationScheduler } from "./shared/services/notification.scheduler";
 import type { AuthenticatedUser } from "./shared/types/auth.types";
 import { appLogger } from "./shared/utils/logger";
 
@@ -23,6 +24,8 @@ const server = app.listen(env.PORT, () => {
 		port: env.PORT,
 	});
 });
+
+startNotificationScheduler();
 
 const gracefulShutdown = (signal: string) => {
 	appLogger.info(`Received ${signal}, starting graceful shutdown...`);

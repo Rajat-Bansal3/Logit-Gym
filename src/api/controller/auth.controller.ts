@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { AuthError, AuthErrorCode } from "../../shared/errors/auth-errors";
-import { changePasswordSchema, loginSchema, registerSchema } from "../../shared/types/auth.types";
+import { changePasswordSchema, deviceTokenSchema, loginSchema, registerSchema } from "../../shared/types/auth.types";
 import { AppLogger } from "../../shared/utils/logger";
 import { client } from "../../shared/utils/prisma";
 import { AuthService } from "../services/auth.service";
@@ -52,6 +52,47 @@ export class AuthController {
 		const data = changePasswordSchema.parse(req.body);
 		await this.memberService.changePasswordMember(data);
 		return res.status(204).json({});
+	};
+
+	// Save / refresh the device's FCM token for this user (idempotent).
+	registerDeviceToken = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user?.userId) {
+				throw new AuthError(AuthErrorCode.FORBIDDEN, "user not found");
+			}
+			const data = deviceTokenSchema.parse(req.body);
+			await client.deviceToken.upsert({
+				where: { token: data.token },
+				create: {
+					userId: user.userId,
+					token: data.token,
+					platform: data.platform,
+				},
+				update: {
+					userId: user.userId,
+					platform: data.platform,
+				},
+			});
+			res.status(200).json({ success: true });
+			return;
+		} catch (error) {
+			next(error);
+		}
+	};
+
+	// Remove a token (e.g. on logout) so we stop pushing to this device.
+	unregisterDeviceToken = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const token = req.body?.token;
+			if (typeof token === "string" && token.length > 0) {
+				await client.deviceToken.deleteMany({ where: { token } });
+			}
+			res.status(200).json({ success: true });
+			return;
+		} catch (error) {
+			next(error);
+		}
 	};
 	// refresh = async (req: Request, res: Response, _next: NextFunction) => {};
 	// logout = async (req: Request, res: Response, _next: NextFunction) => {};
