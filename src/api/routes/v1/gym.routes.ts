@@ -37,6 +37,7 @@ router.get("/plans", roleMiddleware("OWNER"), gymController.getPlans);
 router.post("/subscription", roleMiddleware("OWNER"), gymController.createSubscription);
 
 router.get("/membership-plans", roleMiddleware("OWNER"), gymController.getMembershipPackages);
+router.get("/device-commands", roleMiddleware("OWNER"), catchAsync(gymController.getDeviceCommands));
 /**
  * Get gym details
  */
@@ -65,7 +66,7 @@ router.put(
 
 router.delete("/delete-machine", roleMiddleware("OWNER"), catchAsync(gymController.removeMachine));
 
-router.get("/device-commands", roleMiddleware("OWNER"), catchAsync(gymController.getDeviceCommands));
+
 
 /**
  * Delete a gym
