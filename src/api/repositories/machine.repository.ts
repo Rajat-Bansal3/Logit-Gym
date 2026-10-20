@@ -236,20 +236,71 @@ export class MachineRepository {
 		}
 		return allOk;
 	}
-	async getDeviceLogs(serialNumbers: string[], apiKey: string, date: string): Promise<LogType[]> {
-		const results = await axios.get(`${env.MACHINE_SERVER}/GetDeviceLogs`, {
-			params: {
-				APIKey: String(apiKey),
-				SerialNumber: serialNumbers.map(String).join(","),
-				FromDate: String(date),
-				ToDate: String(date),
-			},
-			timeout: 5000,
-		});
-		return results.data.map((log: any) => ({
-			memberCode: Number(log.EmployeeCode),
-			logDate: log.LogDate,
-		}));
+	// async getDeviceLogs(serialNumbers: string[], apiKey: string, date: string): Promise<LogType[]> {
+	// 	const results = await axios.get(`${env.MACHINE_SERVER}/GetDeviceLogs`, {
+	// 		params: {
+	// 			APIKey: String(apiKey),
+	// 			SerialNumber: serialNumbers.map(String).join(","),
+	// 			FromDate: String(date),
+	// 			ToDate: String(date),
+	// 		},
+	// 		timeout: 5000,
+	// 	});
+	// 	return results.data.map((log: any) => ({
+	// 		memberCode: Number(log.EmployeeCode),
+	// 		logDate: log.LogDate,
+	// 	}));
+	// }
+	async getDeviceLogs(
+		serialNumbers: string[],
+		apiKey: string,
+		date: string,
+	): Promise<LogType[]> {
+		const uniqueSerialNumbers = [
+			...new Set(serialNumbers.filter((serial) => serial.trim().length > 0)),
+		];
+
+		const results = await Promise.all(
+			uniqueSerialNumbers.map(async (serialNumber) => {
+				try {
+					const response = await axios.get(
+						`${env.MACHINE_SERVER}/GetDeviceLogs`,
+						{
+							params: {
+								APIKey: String(apiKey),
+								SerialNumber: serialNumber,
+								FromDate: String(date),
+								ToDate: String(date),
+							},
+							timeout: 10000,
+						},
+					);
+
+					const logs = Array.isArray(response.data)
+						? response.data
+						: [];
+
+					console.info(
+						`[Attendance Sync] Machine ${serialNumber}: ${logs.length} logs`,
+					);
+
+					return logs.map((log: any) => ({
+						memberCode: Number(log.EmployeeCode),
+						logDate: log.LogDate,
+					}));
+				} catch (error) {
+					console.error(
+						`[Attendance Sync] Failed to fetch logs from machine ${serialNumber}:`,
+						error,
+					);
+
+					// An offline machine must not block the other machines.
+					return [];
+				}
+			}),
+		);
+
+		return results.flat();
 	}
 
 	async getDeviceCommands({

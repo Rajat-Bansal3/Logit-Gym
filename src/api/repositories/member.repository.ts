@@ -431,27 +431,36 @@ export class MemberRepository {
 			include: memberWithDetails,
 		});
 	}
-
-	async updateStatus(memberId: string, currStatus: MemberStatus): Promise<Member> {
-		switch (currStatus) {
-			case "ACTIVE":
-				return this.prisma.member.update({
-					where: { id: memberId },
-					data: { status: "INACTIVE" },
-				});
-			case "INACTIVE":
-				return this.prisma.member.update({
-					where: { id: memberId },
-					data: { status: "ACTIVE" },
-				});
-
-			default:
-				return this.prisma.member.update({
-					where: { id: memberId },
-					data: {},
-				});
-		}
+	async updateStatus(
+		memberId: string,
+		status: MemberStatus,
+	): Promise<Member> {
+		return this.prisma.member.update({
+			where: { id: memberId },
+			data: { status },
+		});
 	}
+
+	// async updateStatus(memberId: string, currStatus: MemberStatus): Promise<Member> {
+	// 	switch (currStatus) {
+	// 		case "ACTIVE":
+	// 			return this.prisma.member.update({
+	// 				where: { id: memberId },
+	// 				data: { status: "INACTIVE" },
+	// 			});
+	// 		case "INACTIVE":
+	// 			return this.prisma.member.update({
+	// 				where: { id: memberId },
+	// 				data: { status: "ACTIVE" },
+	// 			});
+
+	// 		default:
+	// 			return this.prisma.member.update({
+	// 				where: { id: memberId },
+	// 				data: {},
+	// 			});
+	// 	}
+	// }
 	async delete(memberId: string) {
 		await this.prisma.member.update({
 			where: {
@@ -944,6 +953,7 @@ export class MemberRepository {
 		return await this.prisma.membership.findMany({
 			where: {
 				memberId: memberId,
+				isDeleted: false
 			},
 			include: {
 				payments: true,

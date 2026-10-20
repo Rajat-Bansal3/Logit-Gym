@@ -735,6 +735,15 @@ export class MemberService {
 			);
 		}
 
+		// added: check if there are multiple memberships before allowing deletion
+		const memberships = await this.memberRepository.getMemberMembership(memberId);
+		if (memberships.length <= 1) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"Cannot delete the only membership for this member.",
+			);
+		}
+
 		// Soft-deletes and restores the previous membership as current.
 		const restoredEndDate = await this.memberRepository.deleteMemberMembership(
 			memberId,
