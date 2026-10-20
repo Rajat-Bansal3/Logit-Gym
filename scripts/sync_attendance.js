@@ -11,9 +11,12 @@
 require("dotenv").config();
 
 const axios = require("axios");
-const { PrismaClient } = require("../src/generated");
+const { PrismaClient } = require("../src/generated/client");
+const { PrismaPg } = require("@prisma/adapter-pg");
+const { Pool } = require("pg");
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 const GYM_BATCH_SIZE = 50;
 const MACHINE_REQUEST_TIMEOUT_MS = 5000;
@@ -296,20 +299,42 @@ function parseMachineLogDate(logDate) {
 }
 
 async function getDeviceLogs(serialNumbers, dateStr) {
-    const response = await axios.get(`${MACHINE_SERVER}/GetDeviceLogs`, {
-        params: {
-            APIKey: MACHINE_SERVER_API_KEY,
-            SerialNumber: serialNumbers, // whole gym's machines in one request
-            FromDate: dateStr,
-            ToDate: dateStr,
-        },
-        timeout: MACHINE_REQUEST_TIMEOUT_MS,
-    });
+    // The machine server only accepts one serial per request.
+    const logs = [];
+    const failures = [];
 
-    return response.data.map((log) => ({
-        memberCode: Number(log.EmployeeCode),
-        logDate: log.LogDate,
-    }));
+    for (const serial of serialNumbers) {
+        const response = await axios.get(`${MACHINE_SERVER}/GetDeviceLogs`, {
+            params: {
+                APIKey: MACHINE_SERVER_API_KEY,
+                SerialNumber: serial,
+                FromDate: dateStr,
+                ToDate: dateStr,
+            },
+            timeout: MACHINE_REQUEST_TIMEOUT_MS,
+        });
+
+        if (!Array.isArray(response.data)) {
+            failures.push(`${serial}: ${response.data?.message ?? "unexpected response"}`);
+            continue;
+        }
+
+        for (const log of response.data) {
+            logs.push({
+                memberCode: Number(log.EmployeeCode),
+                logDate: log.LogDate,
+            });
+        }
+    }
+
+    if (serialNumbers.length > 0 && failures.length === serialNumbers.length) {
+        throw new Error(`All machines failed: ${failures.join("; ")}`);
+    }
+    if (failures.length > 0) {
+        console.warn(`[sync-attendance] some machines failed: ${failures.join("; ")}`);
+    }
+
+    return logs;
 }
 
 async function syncGymAttendance(gym, dateStr) {
