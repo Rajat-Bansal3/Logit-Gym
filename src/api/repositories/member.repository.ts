@@ -257,9 +257,10 @@ export class MemberRepository {
 		const where: Prisma.MemberWhereInput = {
 			gymId,
 			...(status !== undefined && { status }),
-			...(isMachine === true && serialNumber !== undefined && {
-				memberMachines: { some: { machine: { serialNumber } } },
-			}),
+			...(isMachine === true &&
+				serialNumber !== undefined && {
+					memberMachines: { some: { machine: { serialNumber } } },
+				}),
 			...(category === "no-machine" && { memberMachines: { none: {} } }),
 			...(category === "deleted" ? { isDeleted: true } : { isDeleted: false }),
 			...(andConditions.length > 0 && { AND: andConditions }),
@@ -431,10 +432,7 @@ export class MemberRepository {
 			include: memberWithDetails,
 		});
 	}
-	async updateStatus(
-		memberId: string,
-		status: MemberStatus,
-	): Promise<Member> {
+	async updateStatus(memberId: string, status: MemberStatus): Promise<Member> {
 		return this.prisma.member.update({
 			where: { id: memberId },
 			data: { status },
@@ -953,7 +951,7 @@ export class MemberRepository {
 		return await this.prisma.membership.findMany({
 			where: {
 				memberId: memberId,
-				isDeleted: false
+				isDeleted: false,
 			},
 			include: {
 				payments: true,
@@ -1169,10 +1167,7 @@ export class MemberRepository {
 				if (membershipPackage) {
 					const startDate = input.membershipStartDate;
 					if (!startDate) {
-						throw new MemberError(
-							MemberErrorCode.BAD_REQUEST,
-							"Membership start date is required",
-						);
+						throw new MemberError(MemberErrorCode.BAD_REQUEST, "Membership start date is required");
 					}
 					const membership = await tx.membership.create({
 						data: {
@@ -1235,17 +1230,15 @@ export class MemberRepository {
 		});
 	}
 	async createMemberMachines(machineId: string[], memberId: string) {
-		return await Promise.all(
-			machineId.map((id) =>
-				this.prisma.memberMachine.create({
-					data: {
-						assignedAt: new Date(),
-						machineId: id,
-						memberId: memberId,
-					},
-				}),
-			),
-		);
+		if (machineId.length === 0) return;
+		await this.prisma.memberMachine.createMany({
+			data: machineId.map((id) => ({
+				assignedAt: new Date(),
+				machineId: id,
+				memberId,
+			})),
+			skipDuplicates: true,
+		});
 	}
 	async getMembers(memberCodes: number[], gymId: string) {
 		return await this.prisma.member.findMany({

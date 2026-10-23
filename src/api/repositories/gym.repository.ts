@@ -220,6 +220,39 @@ export class GymRepository {
 			},
 		});
 	};
+	/**
+	 * Reserve the next gym-wide member number. Locking the gym row serializes
+	 * concurrent allocations; max membershipCode also covers legacy/manual and
+	 * soft-deleted members. The counter advances even if later onboarding fails,
+	 * so a reserved number is never reused.
+	 */
+	allocateMemberNumber = async (gymId: string): Promise<number> => {
+		return this.client.$transaction(async (tx) => {
+			const gyms = await tx.$queryRaw<
+				{ startingMembershipCode: number | null; biometricCounter: number }[]
+			>`SELECT "startingMembershipCode", "biometricCounter"
+			  FROM gyms WHERE id = ${gymId} FOR UPDATE`;
+			const gym = gyms[0];
+			if (!gym) {
+				throw new GymError(GymErrorCode.NOT_FOUND, "gym not found");
+			}
+
+			const base = gym.startingMembershipCode ?? 1;
+			const highest = await tx.member.aggregate({
+				where: { gymId },
+				_max: { membershipCode: true },
+			});
+			const nextCode = Math.max(
+				base + gym.biometricCounter,
+				(highest._max.membershipCode ?? base - 1) + 1,
+			);
+			await tx.gym.update({
+				where: { id: gymId },
+				data: { biometricCounter: nextCode - base + 1 },
+			});
+			return nextCode;
+		});
+	};
 	delete = async (gymId: string): Promise<void> => {
 		await this.client.gym.update({
 			where: {

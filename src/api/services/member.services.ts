@@ -1,5 +1,12 @@
 import { env } from "../../env";
-import type { CheckInType, Gym, Membership, Payment, Prisma, PrismaClient } from "../../generated/client";
+import type {
+	CheckInType,
+	Gym,
+	Membership,
+	Payment,
+	Prisma,
+	PrismaClient,
+} from "../../generated/client";
 import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import { MemberError, MemberErrorCode } from "../../shared/errors/member-errors";
 import type { AuthenticatedUser, ChangePasswordMember } from "../../shared/types/auth.types";
@@ -53,6 +60,88 @@ export class MemberService {
 		this.machineRepository = new MachineRepository(prisma);
 	}
 
+	private async prepareMachineEnrollment({
+		gymId,
+		memberName,
+		biometricCode,
+		serialNumbers,
+		allowExistingMatch = true,
+		knownMember,
+	}: {
+		gymId: string;
+		memberName: string;
+		biometricCode: number;
+		serialNumbers: string[];
+		allowExistingMatch?: boolean;
+		knownMember?: MemberWithDetails;
+	}): Promise<{ uploadSerialNumbers: string[] }> {
+		const uniqueSerialNumbers = [...new Set(serialNumbers.map((sn) => sn.trim()).filter(Boolean))];
+		const machines = await this.machineRepository.getMachines(gymId, uniqueSerialNumbers);
+		if (machines.length !== uniqueSerialNumbers.length) {
+			throw new MemberError(
+				MemberErrorCode.NOT_FOUND,
+				"One or more selected machines do not belong to this gym.",
+			);
+		}
+
+		const uploadSerialNumbers: string[] = [];
+		const expectedName = memberName.trim().toLocaleLowerCase();
+		for (const serialNumber of uniqueSerialNumbers) {
+			const response = await this.machineRepository.getMachineUsers(
+				serialNumber,
+				env.MACHINE_SERVER_API_KEY,
+			);
+			const users = Array.isArray(response)
+				? response
+				: Array.isArray(response?.records)
+					? response.records
+					: Array.isArray(response?.data)
+						? response.data
+						: Array.isArray(response?.Data)
+							? response.Data
+							: Array.isArray(response?.data?.records)
+								? response.data.records
+								: null;
+			if (users === null) {
+				throw new MemberError(
+					MemberErrorCode.BAD_REQUEST,
+					`Could not verify existing users on machine ${serialNumber}. No user was uploaded. Retry or check the device connection.`,
+				);
+			}
+
+			const existing = users.find((user: Record<string, unknown>) => {
+				const code = user.EmployeeCode ?? user.employeeCode ?? user.Code ?? user.code;
+				return code !== undefined && Number(code) === biometricCode;
+			});
+			if (!existing) {
+				uploadSerialNumbers.push(serialNumber);
+				continue;
+			}
+
+			const existingName = String(
+				existing.EmployeeName ?? existing.employeeName ?? existing.Name ?? existing.name ?? "",
+			)
+				.trim()
+				.toLocaleLowerCase();
+			const linkedToSameMember = knownMember?.memberMachines.some(
+				(link) => link.machine.serialNumber === serialNumber,
+			);
+			const sameName = existingName.length > 0 && existingName === expectedName;
+			if (
+				!allowExistingMatch ||
+				(!linkedToSameMember && !sameName) ||
+				(existingName.length > 0 && existingName !== expectedName)
+			) {
+				throw new MemberError(
+					MemberErrorCode.CONFLICT,
+					`Member number ${biometricCode} is already assigned to another user on machine ${serialNumber}. The existing device user was not changed.`,
+				);
+			}
+		}
+
+		return { uploadSerialNumbers };
+	}
+
 	async onboardMember(
 		gymId: string,
 		data: OnboardMember,
@@ -76,14 +165,9 @@ export class MemberService {
 				"A member with this phone number already exists",
 			);
 		}
-		let membershipCode = data.membershipCode;
-		if (gym.settings && gym.startingMembershipCode && gym.settings.biometricPreference === "AUTO") {
-			membershipCode = gym.startingMembershipCode + gym.biometricCounter;
-		}
-
-		if (!membershipCode) {
-			throw new MemberError(MemberErrorCode.BAD_REQUEST, "membership code not provided");
-		}
+		// Ignore client/machine-provided numbers: every new member gets the next
+		// permanently reserved number in the gym-wide sequence.
+		const membershipCode = await this.gymRepository.allocateMemberNumber(gymId);
 		if (!data.packageId || !data.membershipStartDate) {
 			throw new MemberError(
 				MemberErrorCode.BAD_REQUEST,
@@ -94,7 +178,18 @@ export class MemberService {
 		if (!membershipPackage) {
 			throw new MemberError(MemberErrorCode.BAD_REQUEST, "Plan with planId doesnt exists");
 		}
-		await this.gymRepository.update(gymId, {}, gym.settings?.biometricPreference === "AUTO");
+		const serialNumbers = data.isMachine
+			? [...new Set((data.serialNumbers ?? []).map((sn) => sn.trim()).filter(Boolean))]
+			: [];
+		const enrollment = serialNumbers.length
+			? await this.prepareMachineEnrollment({
+					gymId,
+					memberName: data.name,
+					biometricCode: membershipCode,
+					serialNumbers,
+					allowExistingMatch: false,
+				})
+			: { uploadSerialNumbers: [] };
 		const member = await this.memberRepository.create(
 			gymId,
 			membershipCode,
@@ -104,26 +199,27 @@ export class MemberService {
 			image,
 		);
 
-		if (data.isMachine && data.serialNumbers) {
-			const serialNumbers = data.serialNumbers.filter((serialNumber) => serialNumber.trim());
+		if (data.isMachine && serialNumbers.length > 0) {
 			const membershipEndDate = member.currentMembership?.endDate;
-			if (!serialNumbers.length || !membershipEndDate) {
+			if (!membershipEndDate) {
 				throw new MemberError(
 					MemberErrorCode.BAD_REQUEST,
 					"A machine serial number and membership end date are required for biometric expiry setup.",
 				);
 			}
-			await this.machineRepository.addUser({
-				memberName: member.name,
-				biometricCode: member.membershipCode,
-				apiKey: env.MACHINE_SERVER_API_KEY,
-				serialNumbers,
-				cardNumber: data.cardNumber,
-				IsBioPasswordUpload: data.IsBioPasswordUpload ?? false,
-				IsCardUpload: data.IsCardUpload ?? false,
-				IsFaceUpload: data.IsFaceUpload ?? false,
-				IsFPUpload: data.IsFPUpload ?? false,
-			});
+			if (enrollment.uploadSerialNumbers.length > 0) {
+				await this.machineRepository.addUser({
+					memberName: member.name,
+					biometricCode: member.membershipCode,
+					apiKey: env.MACHINE_SERVER_API_KEY,
+					serialNumbers: enrollment.uploadSerialNumbers,
+					cardNumber: data.cardNumber,
+					IsBioPasswordUpload: data.IsBioPasswordUpload ?? false,
+					IsCardUpload: data.IsCardUpload ?? false,
+					IsFaceUpload: data.IsFaceUpload ?? false,
+					IsFPUpload: data.IsFPUpload ?? false,
+				});
+			}
 			const expiryWasSet = await this.machineRepository.setUserExpiration({
 				apiKey: env.MACHINE_SERVER_API_KEY,
 				biometricCode: member.membershipCode,
@@ -201,22 +297,32 @@ export class MemberService {
 					"The membership end date could not be determined for biometric expiry setup.",
 				);
 			}
-			await this.machineRepository.addUser({
+			const serialNumbers = [...new Set(data.serialNumbers.map((sn) => sn.trim()).filter(Boolean))];
+			const enrollment = await this.prepareMachineEnrollment({
+				gymId,
 				memberName: restored.name,
 				biometricCode: restored.membershipCode,
-				apiKey: env.MACHINE_SERVER_API_KEY,
-				serialNumbers: data.serialNumbers,
-				cardNumber: data.cardNumber,
-				IsBioPasswordUpload: data.IsBioPasswordUpload ?? false,
-				IsCardUpload: data.IsCardUpload ?? false,
-				IsFaceUpload: data.IsFaceUpload ?? false,
-				IsFPUpload: data.IsFPUpload ?? false,
+				serialNumbers,
+				knownMember: member,
 			});
+			if (enrollment.uploadSerialNumbers.length > 0) {
+				await this.machineRepository.addUser({
+					memberName: restored.name,
+					biometricCode: restored.membershipCode,
+					apiKey: env.MACHINE_SERVER_API_KEY,
+					serialNumbers: enrollment.uploadSerialNumbers,
+					cardNumber: data.cardNumber,
+					IsBioPasswordUpload: data.IsBioPasswordUpload ?? false,
+					IsCardUpload: data.IsCardUpload ?? false,
+					IsFaceUpload: data.IsFaceUpload ?? false,
+					IsFPUpload: data.IsFPUpload ?? false,
+				});
+			}
 			const expiryWasSet = await this.machineRepository.setUserExpiration({
 				apiKey: env.MACHINE_SERVER_API_KEY,
 				biometricCode: restored.membershipCode,
 				expirationDate: expiryDate,
-				serialNumbers: data.serialNumbers,
+				serialNumbers,
 			});
 			if (!expiryWasSet) {
 				throw new MemberError(
@@ -253,21 +359,31 @@ export class MemberService {
 			);
 		}
 
-		const machines = await this.machineRepository.getMachines(gymId, data.serialNumbers);
-		if (machines.length < data.serialNumbers.length) {
+		const serialNumbers = [...new Set(data.serialNumbers.map((sn) => sn.trim()).filter(Boolean))];
+		const machines = await this.machineRepository.getMachines(gymId, serialNumbers);
+		if (machines.length < serialNumbers.length) {
 			throw new MemberError(MemberErrorCode.NOT_FOUND, "one or more serial number not found");
 		}
-		await this.machineRepository.addUser({
-			apiKey: env.MACHINE_SERVER_API_KEY,
-			biometricCode: data.membershipCode,
-			memberName: data.name,
-			serialNumbers: data.serialNumbers,
-			IsBioPasswordUpload: false,
-			IsCardUpload: false,
-			IsFaceUpload: false,
-			IsFPUpload: false,
-			cardNumber: undefined,
+		const enrollment = await this.prepareMachineEnrollment({
+			gymId,
+			memberName: member.name,
+			biometricCode: member.membershipCode,
+			serialNumbers,
+			knownMember: member,
 		});
+		if (enrollment.uploadSerialNumbers.length > 0) {
+			await this.machineRepository.addUser({
+				apiKey: env.MACHINE_SERVER_API_KEY,
+				biometricCode: member.membershipCode,
+				memberName: member.name,
+				serialNumbers: enrollment.uploadSerialNumbers,
+				IsBioPasswordUpload: false,
+				IsCardUpload: false,
+				IsFaceUpload: false,
+				IsFPUpload: false,
+				cardNumber: undefined,
+			});
+		}
 		await this.memberRepository.createMemberMachines(
 			machines.map((machine) => machine.id),
 			data.memberId,
@@ -276,7 +392,7 @@ export class MemberService {
 			apiKey: env.MACHINE_SERVER_API_KEY,
 			biometricCode: member.membershipCode,
 			expirationDate: membershipEndDate,
-			serialNumbers: data.serialNumbers,
+			serialNumbers,
 		});
 		if (!expiryWasSet) {
 			throw new MemberError(
@@ -668,7 +784,10 @@ export class MemberService {
 
 		const membershipPackage = await this.gymRepository.getMembershipPackage(gymId, data.packageId);
 		if (!membershipPackage) {
-			throw new MemberError(MemberErrorCode.BAD_REQUEST, "The selected membership plan is no longer available.");
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"The selected membership plan is no longer available.",
+			);
 		}
 
 		let previousMembership: Membership | undefined;
@@ -907,10 +1026,7 @@ export class MemberService {
 			);
 		}
 		if (!membership.isPaused || !membership.pausedAt) {
-			throw new MemberError(
-				MemberErrorCode.BAD_REQUEST,
-				"This membership is not paused.",
-			);
+			throw new MemberError(MemberErrorCode.BAD_REQUEST, "This membership is not paused.");
 		}
 
 		// Whole days elapsed since the pause started.
@@ -1153,20 +1269,9 @@ export class MemberService {
 				continue;
 			}
 
-			let membershipCode: number | undefined = row.EmployeeCode;
-
-			if (
-				gym.settings &&
-				gym.startingMembershipCode !== null &&
-				gym.settings.biometricPreference === "AUTO"
-			) {
-				membershipCode = gym.startingMembershipCode + gym.biometricCounter + valid.length;
-			}
-
-			if (membershipCode === undefined || membershipCode === null) {
-				failed.push({ row: i + 1, reason: "No membership code available" });
-				continue;
-			}
+			// Imported machine/Excel codes are not identities. Assign every new
+			// member from the same gym-wide sequence used by normal onboarding.
+			const membershipCode = await this.gymRepository.allocateMemberNumber(gymId);
 
 			valid.push({
 				membershipCode,
@@ -1193,10 +1298,6 @@ export class MemberService {
 		);
 		if (failed.length > 0) {
 			console.log("⚠️ bulkOnboardExcelMembers: failed rows", failed);
-		}
-
-		if (gym.settings?.biometricPreference === "AUTO" && valid.length > 0) {
-			await this.gymRepository.update(gymId, { biometricCounter: valid.length }, false);
 		}
 
 		return {
