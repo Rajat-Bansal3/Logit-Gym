@@ -253,6 +253,24 @@ export class GymRepository {
 			return nextCode;
 		});
 	};
+	previewNextMemberNumber = async (gymId: string): Promise<number> => {
+		const gym = await this.client.gym.findUnique({
+			where: { id: gymId },
+			select: { startingMembershipCode: true, biometricCounter: true },
+		});
+		if (!gym) {
+			throw new GymError(GymErrorCode.NOT_FOUND, "gym not found");
+		}
+		const base = gym.startingMembershipCode ?? 1;
+		const highest = await this.client.member.aggregate({
+			where: { gymId },
+			_max: { membershipCode: true },
+		});
+		return Math.max(
+			base + gym.biometricCounter,
+			(highest._max.membershipCode ?? base - 1) + 1,
+		);
+	};
 	delete = async (gymId: string): Promise<void> => {
 		await this.client.gym.update({
 			where: {

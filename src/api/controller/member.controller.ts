@@ -27,6 +27,20 @@ export class MemberController {
 		this.logger = new AppLogger();
 	}
 
+	getNextMemberNumber = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			const gymId = req.params.gymId;
+			if (!user || !gymId || Array.isArray(gymId)) {
+				throw new MemberError(MemberErrorCode.UNAUTHORIZED);
+			}
+			const result = await this.memberService.getNextMemberNumber(gymId, user);
+			res.status(200).json(result);
+		} catch (error) {
+			next(error);
+		}
+	};
+
 	onboardMember = async (req: Request, res: Response, next: NextFunction) => {
 		try {
 			this.logger.debug("onboardMember: request received", {

@@ -10,6 +10,8 @@ const controller = new MemberController();
 // All member routes require authentication
 router.use(authMiddleware);
 
+router.get("/next-number", roleMiddleware("OWNER"), controller.getNextMemberNumber);
+
 // POST /gyms/:gymId/members — onboard a new member (owner only)
 router.post(
 	"/",

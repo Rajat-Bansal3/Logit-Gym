@@ -142,12 +142,27 @@ export class MemberService {
 		return { uploadSerialNumbers };
 	}
 
+	async getNextMemberNumber(
+		gymId: string,
+		user: AuthenticatedUser,
+	): Promise<BaseResponse<{ membershipCode: number }>> {
+		if (user.gymId !== gymId) {
+			throw new GymError(GymErrorCode.FORBIDDEN, "not your gym");
+		}
+		const membershipCode = await this.gymRepository.previewNextMemberNumber(gymId);
+		return {
+			message: "next member number preview",
+			success: true,
+			data: { membershipCode },
+		};
+	}
+
 	async onboardMember(
 		gymId: string,
 		data: OnboardMember,
 		_user: AuthenticatedUser,
 		image?: string,
-	): Promise<BaseResponse<{ memberId: string }>> {
+	): Promise<BaseResponse<{ memberId: string; membershipCode: number }>> {
 		this.logger.debug("onboardMember: checking for conflicts", { gymId });
 		const gym = await this.gymRepository.findById({ gymId, isDeleted: false });
 		if (!gym) {
@@ -238,7 +253,7 @@ export class MemberService {
 		return {
 			message: "Member onboarded successfully",
 			success: true,
-			data: { memberId: member.id },
+			data: { memberId: member.id, membershipCode: member.membershipCode },
 		};
 	}
 
@@ -247,7 +262,7 @@ export class MemberService {
 		memberId: string,
 		data: OnboardMember,
 		image?: string,
-	): Promise<BaseResponse<{ memberId: string }>> {
+	): Promise<BaseResponse<{ memberId: string; membershipCode: number }>> {
 		const member = await this.memberRepository.findByIdAndGym(memberId, gymId);
 		if (!member || !member.isDeleted) {
 			throw new MemberError(MemberErrorCode.NOT_FOUND, "Member not found");
@@ -338,7 +353,7 @@ export class MemberService {
 				? "Member restored with their existing active membership"
 				: "Member restored with a new membership",
 			success: true,
-			data: { memberId: restored.id },
+			data: { memberId: restored.id, membershipCode: restored.membershipCode },
 		};
 	}
 	async pushToMachine(
