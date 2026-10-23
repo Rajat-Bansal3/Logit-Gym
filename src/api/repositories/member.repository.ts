@@ -259,8 +259,8 @@ export class MemberRepository {
 			...(status !== undefined && { status }),
 			...(isMachine === true &&
 				serialNumber !== undefined && {
-					memberMachines: { some: { machine: { serialNumber } } },
-				}),
+				memberMachines: { some: { machine: { serialNumber } } },
+			}),
 			...(category === "no-machine" && { memberMachines: { none: {} } }),
 			...(category === "deleted" ? { isDeleted: true } : { isDeleted: false }),
 			...(andConditions.length > 0 && { AND: andConditions }),
@@ -854,6 +854,9 @@ export class MemberRepository {
 		return await this.prisma.payment.findMany({
 			where: {
 				memberId: memberId.id,
+				// Inventory items have their own My Purchases screen; keep the
+				// billing/receipts list focused on membership and regular payments.
+				saleId: null,
 			},
 			include: {
 				gym: true,

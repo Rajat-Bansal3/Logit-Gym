@@ -144,7 +144,7 @@ export class InventoryRepository {
                         .join(", ")})`,
                     category: "Inventory",
                     type: "CREDIT",
-                    status: "PAID",
+                    status: "SUCCESS",
                 },
             });
             await tx.gymMetrics.update({

@@ -198,12 +198,12 @@ export class MemberService {
 			: [];
 		const enrollment = serialNumbers.length
 			? await this.prepareMachineEnrollment({
-					gymId,
-					memberName: data.name,
-					biometricCode: membershipCode,
-					serialNumbers,
-					allowExistingMatch: false,
-				})
+				gymId,
+				memberName: data.name,
+				biometricCode: membershipCode,
+				serialNumbers,
+				allowExistingMatch: false,
+			})
 			: { uploadSerialNumbers: [] };
 		const member = await this.memberRepository.create(
 			gymId,
