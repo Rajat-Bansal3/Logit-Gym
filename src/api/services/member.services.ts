@@ -40,11 +40,13 @@ import {
 	type MemberWithDetails,
 } from "../repositories/member.repository";
 import { AuthService } from "./auth.service";
+import { MachineAddonService } from "./machine-addon.service";
 
 export class MemberService {
 	private readonly memberRepository: MemberRepository;
 	private readonly gymRepository: GymRepository;
 	private readonly machineRepository: MachineRepository;
+	private readonly machineAddonService: MachineAddonService;
 	private readonly inventoryRepository: InventoryRepository;
 	private readonly bulkRepository: BulkRepository;
 	private readonly authService: AuthService;
@@ -58,6 +60,7 @@ export class MemberService {
 		this.logger = new AppLogger();
 		this.authService = new AuthService();
 		this.machineRepository = new MachineRepository(prisma);
+		this.machineAddonService = new MachineAddonService(prisma);
 	}
 
 	private async prepareMachineEnrollment({
@@ -87,6 +90,7 @@ export class MemberService {
 		const uploadSerialNumbers: string[] = [];
 		const expectedName = memberName.trim().toLocaleLowerCase();
 		for (const serialNumber of uniqueSerialNumbers) {
+			await this.machineAddonService.assertMachineActive(gymId, serialNumber);
 			const response = await this.machineRepository.getMachineUsers(
 				serialNumber,
 				env.MACHINE_SERVER_API_KEY,
@@ -447,6 +451,9 @@ export class MemberService {
 		__user: AuthenticatedUser,
 	): Promise<BaseResponse<MemberListResult>> {
 		this.logger.debug("listMembers: fetching members", { gymId });
+		if (query.isMachine && query.serialNumber) {
+			await this.machineAddonService.assertMachineActive(gymId, query.serialNumber);
+		}
 
 		const result = await this.memberRepository.listByGym(gymId, query);
 
@@ -1330,6 +1337,7 @@ export class MemberService {
 		if (user.gymId !== gymId) {
 			throw new GymError(GymErrorCode.FORBIDDEN, "not your gym");
 		}
+		await this.machineAddonService.assertMachineActive(gymId, serialNumber);
 		const payload = await this.machineRepository.getMachineUsers(
 			serialNumber,
 			env.MACHINE_SERVER_API_KEY,

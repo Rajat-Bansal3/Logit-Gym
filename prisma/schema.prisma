@@ -27,32 +27,33 @@ model User {
 }
 
 model Gym {
-  id                     String             @id @default(cuid())
+  id                     String                 @id @default(cuid())
   name                   String
   address                String
-  hash                   String             @unique
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-  isDeleted              Boolean            @default(false)
-  biometricCounter       Int                @default(0)
+  hash                   String                 @unique
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  isDeleted              Boolean                @default(false)
+  biometricCounter       Int                    @default(0)
   startingMembershipCode Int?
   ownerId                String
-  subscriptionStatus     SubscriptionStatus @default(TRIALING)
-  currentSubscriptionId  String?            @unique
+  subscriptionStatus     SubscriptionStatus     @default(TRIALING)
+  currentSubscriptionId  String?                @unique
   settingsId             String
   packages               Package[]
   attendanceLogs         AttendanceLog[]
   gymMetrics             GymMetrics?
   gymProfile             GymProfile?
   gymReports             GymReport[]
-  currentSubscription    Subscription?      @relation("CurrentSubscription", fields: [currentSubscriptionId], references: [id])
-  owner                  User               @relation(fields: [ownerId], references: [id])
-  settings               Settings           @relation(fields: [settingsId], references: [id])
+  currentSubscription    Subscription?          @relation("CurrentSubscription", fields: [currentSubscriptionId], references: [id])
+  owner                  User                   @relation(fields: [ownerId], references: [id])
+  settings               Settings               @relation(fields: [settingsId], references: [id])
   hourlyTraffic          HourlyTraffic[]
   machines               Machines[]
+  machineAddonPurchases  MachineAddonPurchase[]
   members                Member[]
   payments               Payment[]
-  subscriptions          Subscription[]     @relation("GymSubscriptions")
+  subscriptions          Subscription[]         @relation("GymSubscriptions")
   transactions           Transaction[]
   weeklyActivities       WeeklyActivity[]
   products               Product[]
@@ -63,16 +64,40 @@ model Gym {
 }
 
 model Machines {
-  id             String          @id @default(cuid())
-  name           String
-  serialNumber   String          @unique
-  gymId          String?
-  gym            Gym?            @relation(fields: [gymId], references: [id])
-  memberMachines MemberMachine[]
+  id                     String                @id @default(cuid())
+  name                   String
+  serialNumber           String                @unique
+  gymId                  String?
+  machineAddonPurchaseId String?               @unique
+  isLegacyAddon          Boolean               @default(false)
+  gym                    Gym?                  @relation(fields: [gymId], references: [id])
+  machineAddonPurchase   MachineAddonPurchase? @relation(fields: [machineAddonPurchaseId], references: [id], onDelete: SetNull)
+  memberMachines         MemberMachine[]
 
   @@index([serialNumber])
   @@index([name])
   @@map("machines")
+}
+
+model MachineAddonPurchase {
+  id                       String    @id @default(cuid())
+  gymId                    String
+  status                   String    @default("PENDING")
+  amount                   Int       @default(119900)
+  currency                 String    @default("INR")
+  razorpayPaymentLinkId    String?   @unique
+  razorpayPaymentId        String?   @unique
+  renewMachineSerialNumber String?
+  expiresAt                DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  gym                      Gym       @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  machine                  Machines?
+  payment                  Payment?
+
+  @@index([gymId, status])
+  @@index([expiresAt])
+  @@map("machine_addon_purchases")
 }
 
 model Member {
@@ -220,26 +245,28 @@ model Transaction {
 }
 
 model Payment {
-  id            String          @id @default(cuid())
-  memberId      String?
-  membershipId  String?
-  gymId         String
-  amount        Float
-  dueDate       DateTime?
-  paidDate      DateTime?
-  description   String?
-  category      String
-  status        PaymentStatus   @default(SUCCESS)
-  type          TransactionType
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  transactionId String?         @unique
-  saleId        String?         @unique
-  gym           Gym             @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  member        Member?         @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  membership    Membership?     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  transaction   Transaction?    @relation(fields: [transactionId], references: [id])
-  sale          Sale?           @relation(fields: [saleId], references: [id])
+  id                     String                @id @default(cuid())
+  memberId               String?
+  membershipId           String?
+  gymId                  String
+  amount                 Float
+  dueDate                DateTime?
+  paidDate               DateTime?
+  description            String?
+  category               String
+  status                 PaymentStatus         @default(SUCCESS)
+  type                   TransactionType
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  transactionId          String?               @unique
+  saleId                 String?               @unique
+  machineAddonPurchaseId String?               @unique
+  gym                    Gym                   @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  member                 Member?               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  membership             Membership?           @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  transaction            Transaction?          @relation(fields: [transactionId], references: [id])
+  sale                   Sale?                 @relation(fields: [saleId], references: [id])
+  machineAddonPurchase   MachineAddonPurchase? @relation(fields: [machineAddonPurchaseId], references: [id], onDelete: SetNull)
 
   @@index([memberId])
   @@index([membershipId])

@@ -31,9 +31,7 @@ export class NotificationService {
             const sub = gym.currentSubscription;
             if (!sub) continue;
 
-            const daysLeft = Math.ceil(
-                (sub.currentPeriodEnd.getTime() - Date.now()) / DAY_MS,
-            );
+            const daysLeft = Math.ceil((sub.currentPeriodEnd.getTime() - Date.now()) / DAY_MS);
 
             if (daysLeft < 0) {
                 await this._sendOwnerOnce(gym.ownerId, {
@@ -43,8 +41,7 @@ export class NotificationService {
                     body: `Your Synapse plan for ${gym.name} has expired. Renew it from the web dashboard to keep everything running.`,
                 });
             } else if ([7, 3, 1, 0].includes(daysLeft)) {
-                const label =
-                    daysLeft === 0 ? "today" : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+                const label = daysLeft === 0 ? "today" : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
                 await this._sendOwnerOnce(gym.ownerId, {
                     type: `subscription_expiring_${daysLeft}`,
                     targetKey: `${gym.id}:${sub.currentPeriodEnd.toISOString().slice(0, 10)}`,
@@ -76,9 +73,7 @@ export class NotificationService {
             const membership = member.currentMembership;
             if (!membership?.endDate || !member.userId) continue;
 
-            const daysLeft = Math.ceil(
-                (membership.endDate.getTime() - Date.now()) / DAY_MS,
-            );
+            const daysLeft = Math.ceil((membership.endDate.getTime() - Date.now()) / DAY_MS);
 
             if (daysLeft < 0) {
                 await this._sendUserOnce(member.userId, {
@@ -88,13 +83,52 @@ export class NotificationService {
                     body: `Your ${member.gym.name} membership has expired. Ask the front desk to renew it.`,
                 });
             } else if ([7, 3, 1, 0].includes(daysLeft)) {
-                const label =
-                    daysLeft === 0 ? "today" : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+                const label = daysLeft === 0 ? "today" : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
                 await this._sendUserOnce(member.userId, {
                     type: `membership_expiring_${daysLeft}`,
                     targetKey: `${member.id}:${membership.endDate.toISOString().slice(0, 10)}`,
                     title: "Membership expiring soon",
                     body: `Your ${member.gym.name} membership expires ${label}. Renew in time to keep your access.`,
+                });
+            }
+        }
+    }
+
+    /** Daily job: warn owners before paid machine access and attendance sync stop. */
+    async notifyMachineAddonLifecycle(): Promise<void> {
+        const purchases = await this.prisma.machineAddonPurchase.findMany({
+            where: {
+                status: "ACTIVE",
+                expiresAt: { not: null },
+                machine: { isNot: null },
+            },
+            select: {
+                id: true,
+                expiresAt: true,
+                gym: { select: { id: true, name: true, ownerId: true } },
+                machine: { select: { name: true, serialNumber: true } },
+            },
+        });
+
+        for (const purchase of purchases) {
+            if (!purchase.expiresAt || !purchase.machine) continue;
+            const daysLeft = Math.ceil((purchase.expiresAt.getTime() - Date.now()) / DAY_MS);
+            const targetKey = `${purchase.id}:${purchase.expiresAt.toISOString().slice(0, 10)}`;
+
+            if (daysLeft < 0) {
+                await this._sendOwnerOnce(purchase.gym.ownerId, {
+                    type: "machine_addon_expired",
+                    targetKey,
+                    title: "Machine add-on expired",
+                    body: `${purchase.machine.name} is offline for member access and attendance sync until its add-on is renewed. Attendance during expiry may be lost. Renew for ₹1,199/year in Connected Devices.`,
+                });
+            } else if ([7, 3, 1, 0].includes(daysLeft)) {
+                const when = daysLeft === 0 ? "today" : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+                await this._sendOwnerOnce(purchase.gym.ownerId, {
+                    type: `machine_addon_expiring_${daysLeft}`,
+                    targetKey,
+                    title: "Machine add-on expiring",
+                    body: `${purchase.machine.name} add-on expires ${when}. Renew for ₹1,199/year in Connected Devices to keep member access and attendance sync active.`,
                 });
             }
         }

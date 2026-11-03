@@ -338,7 +338,17 @@ async function getDeviceLogs(serialNumbers, dateStr) {
 }
 
 async function syncGymAttendance(gym, dateStr) {
-    const serialNumbers = gym.machines.map((m) => m.serialNumber);
+    const now = new Date();
+    const activeMachines = gym.machines.filter((machine) => {
+        if (machine.isLegacyAddon || !machine.machineAddonPurchaseId) return true;
+        const addon = machine.machineAddonPurchase;
+        return addon?.status === "ACTIVE" && addon.expiresAt && addon.expiresAt > now;
+    });
+    const serialNumbers = activeMachines.map((m) => m.serialNumber);
+
+    if (serialNumbers.length === 0) {
+        return { gymId: gym.id, fetched: 0, inserted: 0, skippedLogs: [] };
+    }
 
     const logs = await getDeviceLogs(serialNumbers, dateStr);
 
@@ -457,14 +467,23 @@ async function run() {
         const gyms = await prisma.gym.findMany({
             where: {
                 isDeleted: false,
-                machines: { some: {} }, // skip gyms with no machine — nothing to sync
+                machines: { some: {} }, // machine eligibility is filtered per device below
             },
             take: GYM_BATCH_SIZE,
             ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
             orderBy: { id: "asc" },
             select: {
                 id: true,
-                machines: { select: { serialNumber: true } },
+                machines: {
+                    select: {
+                        serialNumber: true,
+                        isLegacyAddon: true,
+                        machineAddonPurchaseId: true,
+                        machineAddonPurchase: {
+                            select: { status: true, expiresAt: true },
+                        },
+                    },
+                },
             },
         });
 

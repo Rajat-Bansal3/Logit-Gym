@@ -14,6 +14,7 @@ import { NotificationService } from "./notification.service";
  * - Attendance batches: every 10 minutes.
  * - Subscription (owner) lifecycle: daily at 09:00.
  * - Membership (member) lifecycle: daily at 09:15.
+ * - Machine add-on lifecycle: daily at 09:30.
  */
 export function startNotificationScheduler(): void {
     const notifications = new NotificationService();
@@ -39,6 +40,14 @@ export function startNotificationScheduler(): void {
             await notifications.notifyMembershipLifecycle();
         } catch (error) {
             appLogger.error("membership lifecycle job failed", { error });
+        }
+    });
+
+    cron.schedule("30 9 * * *", async () => {
+        try {
+            await notifications.notifyMachineAddonLifecycle();
+        } catch (error) {
+            appLogger.error("machine add-on lifecycle job failed", { error });
         }
     });
 

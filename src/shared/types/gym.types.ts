@@ -82,6 +82,9 @@ export const addMachineSchema = z.object({
 	serialNumber: z.string().min(1).max(100),
 	machineName: z.string().min(1).max(100),
 });
+export const machineAddonPaymentLinkSchema = z.object({
+	serialNumber: z.string().min(1).max(100).optional(),
+});
 export const deviceCommandsQuerySchema = z.object({
 	serialNumber: z.string().min(1).max(100),
 	fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "fromDate must be yyyy-MM-dd"),

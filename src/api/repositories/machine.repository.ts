@@ -1,6 +1,7 @@
 import axios from "axios";
 import { env } from "../../env";
 import type { PrismaClient } from "../../generated/client";
+import { GymError, GymErrorCode } from "../../shared/errors/gym-errors";
 import { MachineError, MachineErrorCode } from "../../shared/errors/machine-errors";
 
 export type LogType = {
@@ -23,15 +24,52 @@ export class MachineRepository {
 	}): Promise<string> {
 		let machineId: string;
 		try {
-			const db_machine = await this.prisma.machines.create({
-				data: {
-					name: machinename,
-					serialNumber,
-					gymId,
-				},
+			const db_machine = await this.prisma.$transaction(async (tx) => {
+				// Serialize machine additions for this gym so concurrent requests
+				// cannot both claim the single included machine slot.
+				await tx.$queryRaw`SELECT id FROM gyms WHERE id = ${gymId} FOR UPDATE`;
+
+				const includedMachineCount = await tx.machines.count({
+					where: {
+						gymId,
+						isLegacyAddon: false,
+						machineAddonPurchaseId: null,
+					},
+				});
+				let machineAddonPurchaseId: string | null = null;
+
+				if (includedMachineCount > 0) {
+					const candidates = await tx.machineAddonPurchase.findMany({
+						where: {
+							gymId,
+							status: "ACTIVE",
+							expiresAt: { gt: new Date() },
+						},
+						include: { machine: { select: { id: true } } },
+						orderBy: { createdAt: "asc" },
+					});
+					const available = candidates.find((purchase) => purchase.machine === null);
+					if (!available) {
+						throw new GymError(
+							GymErrorCode.BAD_REQUEST,
+							"One machine is included. Add another machine add-on for ₹1,199 per year before connecting this device.",
+						);
+					}
+					machineAddonPurchaseId = available.id;
+				}
+
+				return tx.machines.create({
+					data: {
+						name: machinename,
+						serialNumber,
+						gymId,
+						machineAddonPurchaseId,
+					},
+				});
 			});
 			machineId = db_machine.id;
-		} catch (_error) {
+		} catch (error) {
+			if (error instanceof GymError) throw error;
 			throw new MachineError(MachineErrorCode.REPOSITORY_ERROR);
 		}
 
@@ -251,11 +289,7 @@ export class MachineRepository {
 	// 		logDate: log.LogDate,
 	// 	}));
 	// }
-	async getDeviceLogs(
-		serialNumbers: string[],
-		apiKey: string,
-		date: string,
-	): Promise<LogType[]> {
+	async getDeviceLogs(serialNumbers: string[], apiKey: string, date: string): Promise<LogType[]> {
 		const uniqueSerialNumbers = [
 			...new Set(serialNumbers.filter((serial) => serial.trim().length > 0)),
 		];
@@ -263,26 +297,19 @@ export class MachineRepository {
 		const results = await Promise.all(
 			uniqueSerialNumbers.map(async (serialNumber) => {
 				try {
-					const response = await axios.get(
-						`${env.MACHINE_SERVER}/GetDeviceLogs`,
-						{
-							params: {
-								APIKey: String(apiKey),
-								SerialNumber: serialNumber,
-								FromDate: String(date),
-								ToDate: String(date),
-							},
-							timeout: 10000,
+					const response = await axios.get(`${env.MACHINE_SERVER}/GetDeviceLogs`, {
+						params: {
+							APIKey: String(apiKey),
+							SerialNumber: serialNumber,
+							FromDate: String(date),
+							ToDate: String(date),
 						},
-					);
+						timeout: 10000,
+					});
 
-					const logs = Array.isArray(response.data)
-						? response.data
-						: [];
+					const logs = Array.isArray(response.data) ? response.data : [];
 
-					console.info(
-						`[Attendance Sync] Machine ${serialNumber}: ${logs.length} logs`,
-					);
+					console.info(`[Attendance Sync] Machine ${serialNumber}: ${logs.length} logs`);
 
 					return logs.map((log: any) => ({
 						memberCode: Number(log.EmployeeCode),

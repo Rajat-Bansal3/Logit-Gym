@@ -35,6 +35,12 @@ router.post(
 router.get("/subscription", roleMiddleware("OWNER"), gymController.getSub);
 router.get("/plans", roleMiddleware("OWNER"), gymController.getPlans);
 router.post("/subscription", roleMiddleware("OWNER"), gymController.createSubscription);
+router.get("/machine-addons", roleMiddleware("OWNER"), gymController.getMachineAddonStatus);
+router.post(
+	"/machine-addons/payment-link",
+	roleMiddleware("OWNER"),
+	gymController.createMachineAddonPaymentLink,
+);
 
 router.get("/membership-plans", roleMiddleware("OWNER"), gymController.getMembershipPackages);
 router.get("/device-commands", roleMiddleware("OWNER"), catchAsync(gymController.getDeviceCommands));

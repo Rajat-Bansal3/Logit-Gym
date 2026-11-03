@@ -10,6 +10,7 @@ import {
 	createPlanSchema,
 	createSubscriptionSchema,
 	deviceCommandsQuerySchema,
+	machineAddonPaymentLinkSchema,
 	getPresignedUrlsSchema,
 	syncDataSchema,
 	updateGymSchema,
@@ -157,7 +158,7 @@ export class GymController {
 				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
 			}
 			const data = addMachineSchema.parse(req.body);
-			const resp = await this.gymService.removeMachine(data);
+			const resp = await this.gymService.removeMachine(data, user.gymId);
 			return res.status(200).json(resp);
 		} catch (error) {
 			this.logger.error("remove machine: error", {
@@ -166,6 +167,31 @@ export class GymController {
 			});
 			next(error);
 			return;
+		}
+	};
+	getMachineAddonStatus = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
+			}
+			res.status(200).json(await this.gymService.getMachineAddonStatus(user.gymId));
+		} catch (error) {
+			next(error);
+		}
+	};
+	createMachineAddonPaymentLink = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const user = req.user;
+			if (!user?.gymId) {
+				throw new GymError(GymErrorCode.UNAUTHORIZED, "user not authorised");
+			}
+			const data = machineAddonPaymentLinkSchema.parse(req.body ?? {});
+			res
+				.status(201)
+				.json(await this.gymService.createMachineAddonPaymentLink(user.gymId, data.serialNumber));
+		} catch (error) {
+			next(error);
 		}
 	};
 	getDeviceCommands = async (req: Request, res: Response, next: NextFunction) => {

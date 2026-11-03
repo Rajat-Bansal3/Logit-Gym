@@ -19,7 +19,7 @@ type gym_including_owner = Prisma.GymGetPayload<{
 export type gym_with_profile = Prisma.GymGetPayload<{
 	include: {
 		gymProfile: true;
-		machines: true;
+		machines: { include: { machineAddonPurchase: true } };
 		_count: {
 			select: {
 				members: true;
@@ -142,7 +142,7 @@ export class GymRepository {
 			},
 			include: {
 				gymProfile: true,
-				machines: true,
+				machines: { include: { machineAddonPurchase: true } },
 				_count: {
 					select: {
 						members: {

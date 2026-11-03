@@ -31,6 +31,7 @@ import { BulkRepository, type createManyAttendanceType } from "../repositories/b
 import { GymRepository, type gym_with_profile } from "../repositories/gym.repository";
 import { MachineRepository } from "../repositories/machine.repository";
 import { MemberRepository } from "../repositories/member.repository";
+import { MachineAddonService } from "./machine-addon.service";
 import { type gym_with_sub, PlanRepository } from "../repositories/plan.repository";
 
 export class GymService {
@@ -40,6 +41,7 @@ export class GymService {
 	private planRepository: PlanRepository;
 	private bulkRepository: BulkRepository;
 	private memberRepository: MemberRepository;
+	private machineAddonService: MachineAddonService;
 
 	constructor({ prisma = client }: { prisma: PrismaClient }) {
 		this.gymRepository = new GymRepository(prisma);
@@ -48,6 +50,7 @@ export class GymService {
 		this.planRepository = new PlanRepository(prisma);
 		this.bulkRepository = new BulkRepository(prisma);
 		this.memberRepository = new MemberRepository(prisma);
+		this.machineAddonService = new MachineAddonService(prisma);
 	}
 
 	async createGym(
@@ -218,7 +221,11 @@ export class GymService {
 			success: true,
 		};
 	}
-	async removeMachine(data: AddMachine): Promise<BaseResponse<null>> {
+	async removeMachine(data: AddMachine, gymId: string): Promise<BaseResponse<null>> {
+		const machines = await this.machineRepository.getMachines(gymId, [data.serialNumber]);
+		if (machines.length === 0) {
+			throw new GymError(GymErrorCode.NOT_FOUND, "Machine not found for this gym");
+		}
 		const resp = await this.machineRepository.removeMachine({
 			apiKey: env.MACHINE_SERVER_API_KEY,
 			serialNumber: data.serialNumber,
@@ -229,15 +236,29 @@ export class GymService {
 		};
 	}
 
-	async getDeviceCommands(
+	async getMachineAddonStatus(gymId: string): Promise<BaseResponse<unknown>> {
+		return {
+			message: "machine add-on status fetched",
+			success: true,
+			data: await this.machineAddonService.getStatus(gymId),
+		};
+	}
+
+	async createMachineAddonPaymentLink(
 		gymId: string,
-		query: DeviceCommandsQuery,
-	): Promise<BaseResponse<any[]>> {
+		serialNumber?: string,
+	): Promise<BaseResponse<unknown>> {
+		const data = await this.machineAddonService.createPaymentLink(gymId, serialNumber);
+		return { message: "machine add-on payment link created", success: true, data };
+	}
+
+	async getDeviceCommands(gymId: string, query: DeviceCommandsQuery): Promise<BaseResponse<any[]>> {
 		// Safety: only proxy commands for machines that belong to this gym.
 		const machines = await this.machineRepository.getMachines(gymId, [query.serialNumber]);
 		if (machines.length === 0) {
 			throw new GymError(GymErrorCode.NOT_FOUND, "Machine not found for this gym");
 		}
+		await this.machineAddonService.assertMachineActive(gymId, query.serialNumber);
 		const records = await this.machineRepository.getDeviceCommands({
 			apiKey: env.MACHINE_SERVER_API_KEY,
 			serialNumber: query.serialNumber,
@@ -276,6 +297,7 @@ export class GymService {
 
 		return { presignedUrl, key };
 	};
+
 	getPlans = async (): Promise<BaseResponse<Plan[]>> => {
 		const plans = await this.planRepository.getPlans();
 		return {
@@ -349,11 +371,39 @@ export class GymService {
 			case "subscription.completed":
 				await this.handleSubscriptionCompleted(payload.subscription.entity);
 				break;
+			case "payment_link.paid": {
+				const paymentLink = payload.payment_link?.entity;
+				const payment = payload.payment?.entity;
+				if (paymentLink?.id && payment?.id) {
+					await this.machineAddonService.handlePaymentLinkPaid(
+						paymentLink.id,
+						payment.id,
+						Number(payment.amount ?? paymentLink.amount_paid ?? 0),
+						String(payment.currency ?? paymentLink.currency ?? ""),
+					);
+				}
+				break;
+			}
 		}
 	};
 	syncAttendance = async (syncData: SyncData): Promise<BaseResponse<number>> => {
+		const addonStatus = await this.machineAddonService.getStatus(syncData.gymId);
+		const activeSerials = new Set(
+			addonStatus.machines
+				.filter((machine) => machine.addonActive)
+				.map((machine) => machine.serialNumber),
+		);
+		const serialNumbers = syncData.serialNumber.filter((serial) => activeSerials.has(serial));
+		if (serialNumbers.length === 0) {
+			return {
+				message:
+					"No active machine add-on devices are available to sync. Renew an expired add-on to resume attendance sync.",
+				success: false,
+				data: 0,
+			};
+		}
 		const logs = await this.machineRepository.getDeviceLogs(
-			syncData.serialNumber,
+			serialNumbers,
 			env.MACHINE_SERVER_API_KEY,
 			syncData.date,
 		);
