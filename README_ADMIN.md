@@ -18,12 +18,16 @@ The panel is served by the backend at `/admin`. The page itself contains no acco
 
    Multiple explicitly authorized IDs can be comma-separated. With the variable empty, all admin APIs deny access.
 
-3. Apply the additive Prisma schema changes and regenerate the client:
+3. Apply the schema to the exact database configured for the deployed backend, then regenerate the client:
 
    ```sh
    bunx prisma db push
    bunx prisma generate
    ```
+
+   If your deployment applies SQL manually, use [prisma/admin_panel_migration.sql](./prisma/admin_panel_migration.sql) against that same database. It adds only the suspension flag, invoice payment ID, and refund-request table. Do not deploy the admin backend before this schema update is applied.
+
+   If the backend starts before the migration is applied, the normal app API remains available, but gym suspension enforcement is temporarily skipped and a warning is logged.
 
 4. Configure the Razorpay webhook to include `payment.failed` as well as the existing subscription events. Failed subscription payments will be recorded from that point forward; historical failures cannot be reconstructed if their payment IDs were not stored.
 

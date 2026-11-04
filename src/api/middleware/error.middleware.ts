@@ -1,13 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
-import { Prisma } from "../../generated/client";
 import { AppError } from "../../shared/errors/app-errors";
 import { mapPrismaError } from "../../shared/errors/prisma-error.mapper";
 import { ValidationError } from "../../shared/errors/validation-errors";
 import { appLogger } from "../../shared/utils/logger";
 
 const GENERIC_ERROR_MESSAGE = "Something went wrong. Please try again.";
-const ACTIONABLE_PRISMA_ERROR_CODES = new Set(["P2002", "P2025", "P2003", "P2014"]);
 
 /**
  * Central error handler. The rule is simple: operational errors (AppError
@@ -25,33 +23,13 @@ export const errorHandler = (error: Error, req: Request, res: Response, _next: N
 	if (error instanceof ZodError) {
 		finalError = new ValidationError(error);
 	} else if (!(error instanceof AppError)) {
-		const mappedError = mapPrismaError(error);
-		if (
-			error instanceof Prisma.PrismaClientKnownRequestError &&
-			!ACTIONABLE_PRISMA_ERROR_CODES.has(error.code)
-		) {
-			logger.error("Prisma request failed", {
-				code: error.code,
-				modelName: error.meta?.modelName,
-				table: error.meta?.table,
-				column: error.meta?.column,
-				target: error.meta?.target,
-				path: req.path,
-				method: req.method,
-			});
-		}
-		finalError = mappedError ?? error;
+		finalError = mapPrismaError(error) ?? error;
 	}
 
 	if (finalError instanceof AppError) {
 		return res.status(finalError.statusCode).json({
 			status: "error",
-			code:
-				error instanceof Prisma.PrismaClientKnownRequestError
-					? error.code
-					: "code" in finalError && typeof finalError.code === "string"
-						? finalError.code
-						: "APP_ERROR",
+			code: (finalError as any).code || "APP_ERROR",
 			message: finalError.message,
 			...(finalError instanceof ValidationError && {
 				errors: finalError.errors,
