@@ -359,6 +359,9 @@ export class GymService {
 			case "subscription.charged":
 				await this.handleSubscriptionCharged(payload.subscription.entity, payload.payment.entity);
 				break;
+			case "payment.failed":
+				await this.handleFailedSubscriptionPayment(payload.payment.entity);
+				break;
 			case "subscription.halted":
 				await this.handleSubscriptionHalted(payload.subscription.entity);
 				break;
@@ -534,8 +537,21 @@ export class GymService {
 			amount: payment.amount / 100,
 			paidDate: new Date(payment.created_at * 1000),
 			gatewayInvoiceId: payment.id,
+			gatewayPaymentId: payment.id,
 			currentPeriodStart: new Date(subscription.current_start * 1000),
 			currentPeriodEnd: new Date(subscription.current_end * 1000),
+		});
+	};
+
+	private handleFailedSubscriptionPayment = async (payment: any): Promise<void> => {
+		if (!payment?.id || !payment.subscription_id) {
+			return;
+		}
+		await this.planRepository.recordFailedInvoice({
+			gatewaySubscriptionId: payment.subscription_id,
+			gatewayPaymentId: payment.id,
+			amount: Number(payment.amount ?? 0) / 100,
+			failedAt: new Date(Number(payment.created_at ?? 0) * 1000),
 		});
 	};
 

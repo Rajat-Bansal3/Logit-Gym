@@ -184,9 +184,25 @@ export class MemberService {
 				"A member with this phone number already exists",
 			);
 		}
-		// Ignore client/machine-provided numbers: every new member gets the next
-		// permanently reserved number in the gym-wide sequence.
-		const membershipCode = await this.gymRepository.allocateMemberNumber(gymId);
+		// Reserve from the gym-wide sequence even when the owner chooses a
+		// different free code, so default allocations never reuse a number.
+		const nextMemberNumber = await this.gymRepository.allocateMemberNumber(gymId);
+		const membershipCode = data.membershipCode ?? nextMemberNumber;
+		if (!Number.isSafeInteger(membershipCode) || membershipCode < 1) {
+			throw new MemberError(
+				MemberErrorCode.BAD_REQUEST,
+				"Member number must be a positive whole number.",
+			);
+		}
+		if (data.membershipCode !== undefined) {
+			const codeOwner = await this.memberRepository.findByMembershipCode(gymId, membershipCode);
+			if (codeOwner) {
+				throw new MemberError(
+					MemberErrorCode.CONFLICT,
+					`Member number ${membershipCode} is already assigned in this gym. Choose another number.`,
+				);
+			}
+		}
 		if (!data.packageId || !data.membershipStartDate) {
 			throw new MemberError(
 				MemberErrorCode.BAD_REQUEST,

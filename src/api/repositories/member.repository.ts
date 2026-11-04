@@ -160,6 +160,12 @@ export class MemberRepository {
 			},
 		});
 	}
+	async findByMembershipCode(gymId: string, membershipCode: number): Promise<Member | null> {
+		// Includes soft-deleted members: their number remains permanently reserved.
+		return this.prisma.member.findUnique({
+			where: { gymId_membershipCode: { gymId, membershipCode } },
+		});
+	}
 	async findManyByPhones(phones: string[], gymId: string): Promise<{ phone: string | null }[]> {
 		return this.prisma.member.findMany({
 			where: {

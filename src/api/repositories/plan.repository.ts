@@ -226,12 +226,45 @@ export class PlanRepository {
 		});
 	};
 
+	recordFailedInvoice = async (data: {
+		gatewaySubscriptionId: string;
+		gatewayPaymentId: string;
+		amount: number;
+		failedAt: Date;
+	}) => {
+		const existing = await this.prisma.subscriptionInvoice.findUnique({
+			where: { gatewayPaymentId: data.gatewayPaymentId },
+		});
+		if (existing) {
+			return existing;
+		}
+
+		const subscription = await this.prisma.subscription.findUnique({
+			where: { gatewaySubscriptionId: data.gatewaySubscriptionId },
+			select: { id: true },
+		});
+		if (!subscription) {
+			return null;
+		}
+
+		return this.prisma.subscriptionInvoice.create({
+			data: {
+				subscriptionId: subscription.id,
+				amount: data.amount,
+				status: "FAILED",
+				dueDate: data.failedAt,
+				gatewayPaymentId: data.gatewayPaymentId,
+			},
+		});
+	};
+
 	createInvoiceAndActivate = async (data: {
 		gatewaySubscriptionId: string;
 		gymId: string;
 		amount: number;
 		paidDate: Date;
 		gatewayInvoiceId: string;
+		gatewayPaymentId: string;
 		currentPeriodStart: Date;
 		currentPeriodEnd: Date;
 	}) => {
@@ -254,6 +287,7 @@ export class PlanRepository {
 					dueDate: data.currentPeriodStart,
 					paidDate: data.paidDate,
 					gatewayInvoiceId: data.gatewayInvoiceId,
+					gatewayPaymentId: data.gatewayPaymentId,
 				},
 			});
 

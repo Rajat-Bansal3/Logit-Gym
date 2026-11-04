@@ -34,6 +34,7 @@ model Gym {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   isDeleted              Boolean                @default(false)
+  isSuspended            Boolean                @default(false)
   biometricCounter       Int                    @default(0)
   startingMembershipCode Int?
   ownerId                String
@@ -447,15 +448,34 @@ model SubscriptionInvoice {
   dueDate          DateTime
   paidDate         DateTime?
   gatewayInvoiceId String?       @unique
+  gatewayPaymentId String?       @unique
   hostedInvoiceUrl String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  refundRequest    AdminRefundRequest?
 
   @@index([subscriptionId])
   @@index([status])
   @@index([dueDate])
   @@map("subscription_invoices")
+}
+
+model AdminRefundRequest {
+  id              String              @id @default(cuid())
+  invoiceId       String              @unique
+  amount          Float
+  reason          String
+  status          String              @default("PENDING")
+  gatewayRefundId String?             @unique
+  requestedBy     String
+  errorMessage    String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  invoice         SubscriptionInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("admin_refund_requests")
 }
 
 model Settings {

@@ -22,7 +22,6 @@ export class AuthService {
 
 	async login(data: LoginInput): Promise<BaseResponse<loginReturnType>> {
 		const user = await this.userRepository.getUserByUsername(data.username);
-		console.log(user);
 		if (!user || user === null) {
 			throw new AuthError(AuthErrorCode.FORBIDDEN, "Invalid username or password");
 		}

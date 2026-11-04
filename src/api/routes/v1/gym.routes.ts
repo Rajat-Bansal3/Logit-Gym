@@ -17,8 +17,6 @@ const upload = multer({
 
 const router = Router();
 const gymController = new GymController();
-router.get("/create-plan", gymController.createPlan);
-
 //cron - sync data
 router.post("/sync-attendances", catchAsync(gymController.syncAttendance));
 router.use(authMiddleware);

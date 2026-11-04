@@ -22,7 +22,6 @@ export class AuthController {
 		this.logger.debug("login request");
 		const data = loginSchema.parse(req.body);
 		const result = await this.authService.login(data);
-		this.logger.debug("logged in complete for", result);
 
 		res.status(200).json(result);
 	};

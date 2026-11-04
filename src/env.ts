@@ -19,6 +19,7 @@ const envSchema = z.object({
 	RAZORPAY_WEBHOOK_SECRET: z.coerce.string(),
 	NODE_ENV: z.enum(["development", "testing", "production"]).default("development"),
 	PLANS_API_KEY: z.string().min(1),
+	ADMIN_USER_IDS: z.string().default(""),
 	// Firebase Admin SDK (optional). Push notifications are skipped when unset.
 	FIREBASE_PROJECT_ID: z.string().optional(),
 	FIREBASE_CLIENT_EMAIL: z.string().optional(),
