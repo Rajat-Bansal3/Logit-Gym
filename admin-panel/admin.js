@@ -8,6 +8,7 @@ const logoutButton = document.querySelector("#logout");
 const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value || 0);
 const date = (value) => value ? new Date(value).toLocaleDateString() : "-";
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+const describeError = (error) => `${error.message}${/^P\d{4}$/.test(error.code || "") ? ` (${error.code})` : ""}`;
 
 async function api(path, options = {}) {
   const token = sessionStorage.getItem(tokenKey);
@@ -20,7 +21,12 @@ async function api(path, options = {}) {
     },
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.message || `Request failed (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(payload.message || `Request failed (${response.status})`);
+    error.status = response.status;
+    error.code = payload.code;
+    throw error;
+  }
   return payload;
 }
 
@@ -49,47 +55,96 @@ function renderStats(data) {
   document.querySelector("#stats").innerHTML = stats.map(([label, value]) => `<div class="stat"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
 }
 
+function renderGyms(gyms) {
+  document.querySelector("#gyms-table").innerHTML = gyms.map((gym) => {
+    const current = gym.currentSubscription;
+    const owner = gym.owner.email || gym.owner.username;
+    const state = gym.isDeleted ? "DELETED" : gym.isSuspended ? "SUSPENDED" : gym.subscriptionStatus;
+    const actions = gym.isDeleted ? "-" : `<button class="${gym.isSuspended ? "secondary" : "danger"}" data-gym-status="${escapeHtml(gym.id)}" data-suspended="${!gym.isSuspended}">${gym.isSuspended ? "Restore" : "Suspend"}</button>${current?.status === "TRIALING" ? `<button class="secondary" data-trial="${escapeHtml(gym.id)}">Extend trial</button>` : ""}`;
+    return `<tr><td>${escapeHtml(gym.name)}<small>${escapeHtml(owner)} · joined ${date(gym.createdAt)}</small></td><td>${gym.memberCount}</td><td>${escapeHtml(current?.plan?.name || "-")}</td><td>${escapeHtml(state)}<small>period ends ${date(current?.currentPeriodEnd)}</small></td><td>${money(gym.subscriptionRevenue)}</td><td>${money(gym.gymCollections)}</td><td>${actions}</td></tr>`;
+  }).join("") || '<tr><td colspan="7">No gyms found.</td></tr>';
+}
+
+function renderPlans(plans) {
+  document.querySelector("#plans-table").innerHTML = plans.map((plan) => `<tr><td>${escapeHtml(plan.name)}</td><td>${money(plan.price)}</td><td>${escapeHtml(plan.billingCycle)}</td><td>${escapeHtml(plan.razorpayId)}</td><td>${plan.isActive ? "Active" : "Inactive"}</td><td><button class="secondary" data-plan="${escapeHtml(plan.id)}" data-active="${!plan.isActive}">${plan.isActive ? "Deactivate" : "Activate"}</button></td></tr>`).join("") || '<tr><td colspan="6">No plans found.</td></tr>';
+}
+
+function renderBilling(billing) {
+  const paidInvoices = billing.invoices.filter((invoice) => invoice.status === "PAID").slice(0, 20);
+  document.querySelector("#recent-invoices").innerHTML = paidInvoices.map((invoice) => `<tr><td>${escapeHtml(invoice.subscription.gym.name)}</td><td>${escapeHtml(invoice.subscription.plan.name)}</td><td>${money(invoice.amount)}</td><td>${escapeHtml(invoice.status)}</td><td>${date(invoice.paidDate || invoice.createdAt)}</td></tr>`).join("") || '<tr><td colspan="5">No subscription invoices yet.</td></tr>';
+
+  document.querySelector("#invoices-table").innerHTML = billing.invoices.map((invoice) => {
+    const gymName = invoice.subscription.gym.name;
+    const reference = invoice.gatewayPaymentId || invoice.gatewayInvoiceId || "-";
+    const refund = invoice.status === "PAID" && reference !== "-" && !invoice.refundRequest
+      ? `<button class="danger" data-refund="${escapeHtml(invoice.id)}">Request full refund</button>`
+      : escapeHtml(invoice.refundRequest?.status || "-");
+    return `<tr><td>${escapeHtml(gymName)}</td><td>${escapeHtml(invoice.subscription.plan.name)}</td><td>${money(invoice.amount)}</td><td>${escapeHtml(invoice.status)}</td><td>${escapeHtml(reference)}</td><td>${refund}</td></tr>`;
+  }).join("") || '<tr><td colspan="6">No subscription invoices.</td></tr>';
+
+  document.querySelector("#subscriptions-table").innerHTML = billing.pendingSubscriptions.map((sub) => `<tr><td>${escapeHtml(sub.gym.name)}</td><td>${escapeHtml(sub.plan.name)}</td><td>${escapeHtml(sub.status)}</td><td>${escapeHtml(sub.renue_status)}</td><td>${date(sub.currentPeriodEnd)}</td></tr>`).join("") || '<tr><td colspan="5">No pending subscriptions.</td></tr>';
+  document.querySelector("#member-payments-table").innerHTML = billing.memberPayments.map((payment) => `<tr><td>${escapeHtml(payment.gym.name)}</td><td>${escapeHtml(payment.member?.name || "-")}</td><td>${money(payment.amount)}</td><td>${escapeHtml(payment.status)}</td><td>${date(payment.dueDate)}</td></tr>`).join("") || '<tr><td colspan="5">No pending or failed gym payments.</td></tr>';
+  document.querySelector("#refunds-table").innerHTML = billing.refunds.map((refund) => `<tr><td>${escapeHtml(refund.invoice.subscription.gym.name)}</td><td>${money(refund.amount)}</td><td>${escapeHtml(refund.reason)}</td><td>${escapeHtml(refund.status)}${refund.errorMessage ? `<small>${escapeHtml(refund.errorMessage)}</small>` : ""}</td><td>${escapeHtml(refund.gatewayRefundId || "-")}</td><td>${date(refund.updatedAt)}</td></tr>`).join("") || '<tr><td colspan="6">No refund requests.</td></tr>';
+}
+
 async function loadDashboard() {
   dashboardMessage.textContent = "Loading…";
-  try {
-    const [overview, gyms, plans, billing] = await Promise.all([
-      api("/overview"), api("/gyms"), api("/plans"), api("/billing"),
-    ]);
-    renderStats(overview);
-    const paidInvoices = billing.invoices.filter((invoice) => invoice.status === "PAID").slice(0, 20);
-    document.querySelector("#recent-invoices").innerHTML = paidInvoices.map((invoice) => `<tr><td>${escapeHtml(invoice.subscription.gym.name)}</td><td>${escapeHtml(invoice.subscription.plan.name)}</td><td>${money(invoice.amount)}</td><td>${escapeHtml(invoice.status)}</td><td>${date(invoice.paidDate || invoice.createdAt)}</td></tr>`).join("") || '<tr><td colspan="5">No subscription invoices yet.</td></tr>';
-
-    document.querySelector("#gyms-table").innerHTML = gyms.map((gym) => {
-      const current = gym.currentSubscription;
-      const owner = gym.owner.email || gym.owner.username;
-      const state = gym.isDeleted ? "DELETED" : gym.isSuspended ? "SUSPENDED" : gym.subscriptionStatus;
-      const actions = gym.isDeleted ? "-" : `<button class="${gym.isSuspended ? "secondary" : "danger"}" data-gym-status="${escapeHtml(gym.id)}" data-suspended="${!gym.isSuspended}">${gym.isSuspended ? "Restore" : "Suspend"}</button>${current?.status === "TRIALING" ? `<button class="secondary" data-trial="${escapeHtml(gym.id)}">Extend trial</button>` : ""}`;
-      return `<tr><td>${escapeHtml(gym.name)}<small>${escapeHtml(owner)} · joined ${date(gym.createdAt)}</small></td><td>${gym.memberCount}</td><td>${escapeHtml(current?.plan?.name || "-")}</td><td>${escapeHtml(state)}<small>period ends ${date(current?.currentPeriodEnd)}</small></td><td>${money(gym.subscriptionRevenue)}</td><td>${money(gym.gymCollections)}</td><td>${actions}</td></tr>`;
-    }).join("") || '<tr><td colspan="7">No gyms found.</td></tr>';
-
-    document.querySelector("#plans-table").innerHTML = plans.map((plan) => `<tr><td>${escapeHtml(plan.name)}</td><td>${money(plan.price)}</td><td>${escapeHtml(plan.billingCycle)}</td><td>${escapeHtml(plan.razorpayId)}</td><td>${plan.isActive ? "Active" : "Inactive"}</td><td><button class="secondary" data-plan="${escapeHtml(plan.id)}" data-active="${!plan.isActive}">${plan.isActive ? "Deactivate" : "Activate"}</button></td></tr>`).join("") || '<tr><td colspan="6">No plans found.</td></tr>';
-
-    document.querySelector("#invoices-table").innerHTML = billing.invoices.map((invoice) => {
-      const gymName = invoice.subscription.gym.name;
-      const reference = invoice.gatewayPaymentId || invoice.gatewayInvoiceId || "-";
-      const refund = invoice.status === "PAID" && reference !== "-" && !invoice.refundRequest
-        ? `<button class="danger" data-refund="${escapeHtml(invoice.id)}">Request full refund</button>`
-        : escapeHtml(invoice.refundRequest?.status || "-");
-      return `<tr><td>${escapeHtml(gymName)}</td><td>${escapeHtml(invoice.subscription.plan.name)}</td><td>${money(invoice.amount)}</td><td>${escapeHtml(invoice.status)}</td><td>${escapeHtml(reference)}</td><td>${refund}</td></tr>`;
-    }).join("") || '<tr><td colspan="6">No subscription invoices.</td></tr>';
-
-    document.querySelector("#subscriptions-table").innerHTML = billing.pendingSubscriptions.map((sub) => `<tr><td>${escapeHtml(sub.gym.name)}</td><td>${escapeHtml(sub.plan.name)}</td><td>${escapeHtml(sub.status)}</td><td>${escapeHtml(sub.renue_status)}</td><td>${date(sub.currentPeriodEnd)}</td></tr>`).join("") || '<tr><td colspan="5">No pending subscriptions.</td></tr>';
-    document.querySelector("#member-payments-table").innerHTML = billing.memberPayments.map((payment) => `<tr><td>${escapeHtml(payment.gym.name)}</td><td>${escapeHtml(payment.member?.name || "-")}</td><td>${money(payment.amount)}</td><td>${escapeHtml(payment.status)}</td><td>${date(payment.dueDate)}</td></tr>`).join("") || '<tr><td colspan="5">No pending or failed gym payments.</td></tr>';
-    document.querySelector("#refunds-table").innerHTML = billing.refunds.map((refund) => `<tr><td>${escapeHtml(refund.invoice.subscription.gym.name)}</td><td>${money(refund.amount)}</td><td>${escapeHtml(refund.reason)}</td><td>${escapeHtml(refund.status)}${refund.errorMessage ? `<small>${escapeHtml(refund.errorMessage)}</small>` : ""}</td><td>${escapeHtml(refund.gatewayRefundId || "-")}</td><td>${date(refund.updatedAt)}</td></tr>`).join("") || '<tr><td colspan="6">No refund requests.</td></tr>';
-    dashboardMessage.textContent = "Updated just now";
-  } catch (error) {
-    if (/401|403|not enabled|forbidden/i.test(error.message)) {
-      sessionStorage.removeItem(tokenKey);
-      showLogin(error.message);
-    } else {
-      dashboardMessage.textContent = error.message;
-    }
+  const sectionMessages = {
+    overview: document.querySelector("#overview-message"),
+    gyms: document.querySelector("#gyms-message"),
+    plans: document.querySelector("#plans-message"),
+    billing: document.querySelector("#billing-message"),
+  };
+  Object.values(sectionMessages).forEach((message) => { message.textContent = ""; });
+  const results = await Promise.allSettled([
+    api("/overview"), api("/gyms"), api("/plans"), api("/billing"),
+  ]);
+  const authFailure = results.find((result) =>
+    result.status === "rejected" && [401, 403].includes(result.reason.status),
+  );
+  if (authFailure) {
+    sessionStorage.removeItem(tokenKey);
+    showLogin(authFailure.reason.message);
+    return;
   }
+
+  const [overview, gyms, plans, billing] = results;
+  const errors = [];
+  if (overview.status === "fulfilled") {
+    renderStats(overview.value);
+  } else {
+    document.querySelector("#stats").innerHTML = "";
+    sectionMessages.overview.textContent = `Overview data could not be loaded: ${describeError(overview.reason)}`;
+    errors.push("overview");
+  }
+  if (gyms.status === "fulfilled") {
+    renderGyms(gyms.value);
+  } else {
+    document.querySelector("#gyms-table").innerHTML = "";
+    sectionMessages.gyms.textContent = `Gym data could not be loaded: ${describeError(gyms.reason)}`;
+    errors.push("gyms");
+  }
+  if (plans.status === "fulfilled") {
+    renderPlans(plans.value);
+  } else {
+    document.querySelector("#plans-table").innerHTML = "";
+    sectionMessages.plans.textContent = `Plan data could not be loaded: ${describeError(plans.reason)}`;
+    errors.push("plans");
+  }
+  if (billing.status === "fulfilled") {
+    renderBilling(billing.value);
+  } else {
+    for (const selector of ["#recent-invoices", "#invoices-table", "#subscriptions-table", "#member-payments-table", "#refunds-table"]) {
+      document.querySelector(selector).innerHTML = "";
+    }
+    const message = describeError(billing.reason);
+    sectionMessages.overview.textContent = [sectionMessages.overview.textContent, `Recent invoices could not be loaded: ${message}`].filter(Boolean).join(" ");
+    sectionMessages.billing.textContent = `Billing data could not be loaded: ${message}`;
+    errors.push("billing");
+  }
+  dashboardMessage.textContent = errors.length
+    ? `Some sections could not be loaded (${errors.join(", ")}).`
+    : "Updated just now";
 }
 
 document.querySelector("#login-form").addEventListener("submit", async (event) => {

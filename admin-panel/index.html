@@ -42,6 +42,7 @@
         <p id="dashboard-message" class="message" role="status"></p>
 
         <section class="view active" id="view-overview">
+          <p id="overview-message" class="message" role="status"></p>
           <div class="stats" id="stats"></div>
           <p class="note">Synapse revenue is paid platform subscription invoices, less processed refunds. Gym collections are recorded member and add-on payments.</p>
           <h2>Recent subscription invoices</h2>
@@ -49,11 +50,13 @@
         </section>
 
         <section class="view" id="view-gyms">
+          <p id="gyms-message" class="message" role="status"></p>
           <h2>Gyms</h2>
           <div class="table-wrap"><table><thead><tr><th>Gym / owner</th><th>Members</th><th>Plan</th><th>Subscription</th><th>Synapse revenue</th><th>Gym collections</th><th>Actions</th></tr></thead><tbody id="gyms-table"></tbody></table></div>
         </section>
 
         <section class="view" id="view-plans">
+          <p id="plans-message" class="message" role="status"></p>
           <h2>Plans</h2>
           <form id="plan-form" class="inline-form">
             <label>Name<input name="name" maxlength="80" required></label>
@@ -66,6 +69,7 @@
         </section>
 
         <section class="view" id="view-billing">
+          <p id="billing-message" class="message" role="status"></p>
           <h2>Subscription invoices</h2>
           <div class="table-wrap"><table><thead><tr><th>Gym</th><th>Plan</th><th>Amount</th><th>Status</th><th>Payment reference</th><th>Refund</th></tr></thead><tbody id="invoices-table"></tbody></table></div>
           <h2>Pending subscriptions</h2>
