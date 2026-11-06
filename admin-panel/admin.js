@@ -147,6 +147,37 @@ async function loadDashboard() {
     : "Updated just now";
 }
 
+function formatRupees(paise) {
+  return money((paise || 0) / 100);
+}
+
+function renderWhatsAppAdmin(data) {
+  const price = data.settings.pricePerMessagePaise;
+  document.querySelector("#whatsapp-settings-form [name=price]").value =
+    price == null ? "" : (price / 100).toFixed(2);
+  document.querySelector("#whatsapp-settings-form [name=threshold]").value =
+    (data.settings.lowBalanceThresholdPaise / 100).toFixed(2);
+  document.querySelector("#whatsapp-templates-table").innerHTML =
+    data.templates.map((template) => `<tr><td>${escapeHtml(template.name)}<small>${escapeHtml(template.language)}</small></td><td>${escapeHtml(template.category)}</td><td>${escapeHtml(template.externalTemplateKey)}</td><td>${template.providerApproved ? "Approved" : "Not approved"}</td><td>${template.isVisible ? "Visible" : "Hidden"}</td><td><button class="secondary" data-whatsapp-template="${escapeHtml(template.id)}" data-field="isVisible" data-value="${!template.isVisible}">${template.isVisible ? "Hide" : "Show"}</button> <button class="secondary" data-whatsapp-template="${escapeHtml(template.id)}" data-field="providerApproved" data-value="${!template.providerApproved}">${template.providerApproved ? "Mark pending" : "Mark approved"}</button></td></tr>`).join("") || '<tr><td colspan="6">No templates yet.</td></tr>';
+  document.querySelector("#whatsapp-wallets-table").innerHTML =
+    data.wallets.map((wallet) => `<tr><td>${escapeHtml(wallet.gym.name)}<small>${escapeHtml(wallet.gym.id)}</small></td><td>${escapeHtml(wallet.gym.owner.username)}</td><td>${wallet.enabled ? "On" : "Off"}</td><td>${formatRupees(wallet.balancePaise)}</td><td>${wallet.utilityFreeUsed}/100</td></tr>`).join("") || '<tr><td colspan="5">No WhatsApp wallets yet. They are created when owners open the feature.</td></tr>';
+  document.querySelector("#whatsapp-gym-select").innerHTML = data.wallets
+    .map((wallet) => `<option value="${escapeHtml(wallet.gymId)}">${escapeHtml(wallet.gym.name)} (${escapeHtml(wallet.gymId)})</option>`)
+    .join("") || '<option value="">No wallets yet</option>';
+}
+
+async function loadWhatsAppAdmin() {
+  const message = document.querySelector("#whatsapp-admin-message");
+  message.textContent = "Loading WhatsApp settings…";
+  try {
+    const data = await api("/whatsapp");
+    renderWhatsAppAdmin(data);
+    message.textContent = "WhatsApp admin settings updated.";
+  } catch (error) {
+    message.textContent = error.message;
+  }
+}
+
 document.querySelector("#login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   loginMessage.textContent = "Signing in…";
@@ -162,6 +193,7 @@ document.querySelector("#login-form").addEventListener("submit", async (event) =
     sessionStorage.setItem(tokenKey, payload.data.tokens.authToken);
     showDashboard();
     await loadDashboard();
+    await loadWhatsAppAdmin();
   } catch (error) {
     loginMessage.textContent = error.message;
   }
@@ -178,6 +210,97 @@ document.querySelectorAll(".tab").forEach((button) => button.addEventListener("c
   button.classList.add("active");
   document.querySelector(`#view-${button.dataset.tab}`).classList.add("active");
 }));
+
+document.querySelector("#whatsapp-settings-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const price = String(form.get("price") || "").trim();
+  try {
+    await api("/whatsapp/settings", {
+      method: "PUT",
+      body: JSON.stringify({
+        pricePerMessagePaise: price ? Math.round(Number(price) * 100) : null,
+        lowBalanceThresholdPaise: Math.round(Number(form.get("threshold")) * 100),
+      }),
+    });
+    await loadWhatsAppAdmin();
+  } catch (error) {
+    document.querySelector("#whatsapp-admin-message").textContent = error.message;
+  }
+});
+
+document.querySelector("#whatsapp-template-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  try {
+    await api("/whatsapp/templates", {
+      method: "POST",
+      body: JSON.stringify({
+        externalTemplateKey: form.get("key"),
+        name: form.get("name"),
+        category: form.get("category"),
+        language: form.get("language"),
+        previewText: form.get("preview"),
+        variableNames: String(form.get("variables") || "").split(",").map((value) => value.trim()).filter(Boolean),
+        providerApproved: form.get("approved") === "on",
+        isVisible: form.get("visible") === "on",
+      }),
+    });
+    event.currentTarget.reset();
+    await loadWhatsAppAdmin();
+  } catch (error) {
+    document.querySelector("#whatsapp-admin-message").textContent = error.message;
+  }
+});
+
+document.querySelector("#whatsapp-credit-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const gymId = String(form.get("gymId"));
+  try {
+    await api(`/whatsapp/wallets/${encodeURIComponent(gymId)}/credit`, {
+      method: "POST",
+      body: JSON.stringify({
+        amountPaise: Math.round(Number(form.get("amount")) * 100),
+        note: form.get("note"),
+      }),
+    });
+    event.currentTarget.reset();
+    await loadWhatsAppAdmin();
+  } catch (error) {
+    document.querySelector("#whatsapp-admin-message").textContent = error.message;
+  }
+});
+
+document.querySelector("#whatsapp-templates-table").addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-whatsapp-template]");
+  if (!button) return;
+  try {
+    const data = await api("/whatsapp");
+    const template = data.templates.find((item) => item.id === button.dataset.whatsappTemplate);
+    if (!template) throw new Error("Template no longer exists. Refresh and try again.");
+    await api(`/whatsapp/templates/${encodeURIComponent(template.id)}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        category: template.category,
+        externalTemplateKey: template.externalTemplateKey,
+        name: template.name,
+        language: template.language,
+        previewText: template.previewText,
+        variableNames: template.variableNames,
+        providerApproved: button.dataset.field === "providerApproved"
+          ? button.dataset.value === "true"
+          : template.providerApproved,
+        isVisible: button.dataset.field === "isVisible"
+          ? button.dataset.value === "true"
+          : template.isVisible,
+      }),
+    });
+    await loadWhatsAppAdmin();
+  } catch (error) {
+    document.querySelector("#whatsapp-admin-message").textContent = error.message;
+  }
+});
 
 document.querySelector("#plan-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -218,4 +341,5 @@ dashboard.addEventListener("click", async (event) => {
 if (sessionStorage.getItem(tokenKey)) {
   showDashboard();
   loadDashboard();
+  loadWhatsAppAdmin();
 }

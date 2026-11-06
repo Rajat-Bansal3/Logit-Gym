@@ -59,6 +59,8 @@ model Gym {
   weeklyActivities       WeeklyActivity[]
   products               Product[]
   sales                  Sale[]
+  whatsappWallet        WhatsAppWallet?
+  whatsappMessages      WhatsAppMessage[]
 
   @@unique([isDeleted, ownerId])
   @@map("gyms")
@@ -136,6 +138,8 @@ model Member {
   transactions        Transaction[]
   weeklyActivities    WeeklyActivity[]
   sales               Sale[]
+  whatsappConsent    WhatsAppConsent?
+  whatsappMessages   WhatsAppMessage[]
 
   @@unique([gymId, membershipCode])
   @@unique([gymId, phone])
@@ -626,4 +630,137 @@ model NotificationLog {
   @@index([type])
   @@index([sentAt])
   @@map("notification_logs")
+}
+
+enum WhatsAppTemplateCategory {
+  UTILITY
+  MARKETING
+}
+
+enum WhatsAppMessageStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum WhatsAppWalletTransactionKind {
+  TOP_UP
+  MESSAGE_CHARGE
+  MESSAGE_REFUND
+}
+
+model WhatsAppGlobalSettings {
+  id                       String   @id @default("global")
+  pricePerMessagePaise     Int?
+  lowBalanceThresholdPaise Int      @default(2000)
+  providerName             String   @default("UNCONFIGURED")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("whatsapp_global_settings")
+}
+
+model WhatsAppTemplate {
+  id                  String                    @id @default(cuid())
+  category            WhatsAppTemplateCategory
+  externalTemplateKey String                    @unique
+  name                String
+  language            String
+  previewText         String
+  variableNames       Json                      @default("[]")
+  providerApproved    Boolean                   @default(false)
+  isVisible           Boolean                   @default(true)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  messages            WhatsAppMessage[]
+
+  @@index([isVisible, category])
+  @@map("whatsapp_templates")
+}
+
+model WhatsAppWallet {
+  id                     String                  @id @default(cuid())
+  gymId                  String                  @unique
+  enabled                Boolean                 @default(false)
+  balancePaise           Int                     @default(0)
+  utilityFreeUsed        Int                     @default(0)
+  utilityFreeReserved    Int                     @default(0)
+  lowBalanceAlertSent    Boolean                 @default(false)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  gym                    Gym                     @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  ledger                 WhatsAppWalletLedger[]
+  messages               WhatsAppMessage[]
+
+  @@index([balancePaise])
+  @@map("whatsapp_wallets")
+}
+
+model WhatsAppWalletLedger {
+  id             String                         @id @default(cuid())
+  walletId       String
+  kind           WhatsAppWalletTransactionKind
+  amountPaise    Int
+  balanceBefore  Int
+  balanceAfter   Int
+  note           String?
+  reference      String?
+  createdAt      DateTime                       @default(now())
+  wallet         WhatsAppWallet                 @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  @@index([walletId, createdAt])
+  @@index([reference])
+  @@map("whatsapp_wallet_ledger")
+}
+
+model WhatsAppConsent {
+  id                 String   @id @default(cuid())
+  memberId           String   @unique
+  utilityOptIn       Boolean  @default(false)
+  marketingOptIn     Boolean  @default(false)
+  utilityOptedInAt   DateTime?
+  marketingOptedInAt DateTime?
+  recordedBy         String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  member             Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_consents")
+}
+
+model WhatsAppMessage {
+  id                    String                    @id @default(cuid())
+  gymId                 String
+  walletId              String
+  memberId              String?
+  memberIdSnapshot      String
+  templateId            String?
+  templateKeySnapshot   String
+  idempotencyKey        String
+  recipientName         String
+  recipientPhone        String
+  category              WhatsAppTemplateCategory
+  provider              String
+  status                WhatsAppMessageStatus     @default(PENDING)
+  sentAt                DateTime?
+  deliveredAt           DateTime?
+  failureReason         String?
+  failureCode           String?
+  providerMessageId     String?
+  isFree                Boolean                   @default(false)
+  chargePaise           Int                       @default(0)
+  balanceBefore         Int
+  balanceAfter          Int
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  gym                   Gym                       @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  wallet                WhatsAppWallet            @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  member                Member?                   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  template              WhatsAppTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@unique([gymId, idempotencyKey])
+  @@index([gymId, createdAt])
+  @@index([memberIdSnapshot, createdAt])
+  @@index([status, createdAt])
+  @@map("whatsapp_messages")
 }

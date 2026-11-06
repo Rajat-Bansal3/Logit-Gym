@@ -53,6 +53,7 @@ export const createApp = () => {
 	});
 	app.use("/api/v1/auth", require("./api/routes/v1/auth.routes").default);
 	app.use("/api/v1/admin", require("./api/routes/v1/admin.routes").default);
+	app.use("/api/v1/gym", require("./api/routes/v1/whatsapp.routes").default);
 	app.use("/api/v1/gym", require("./api/routes/v1/gym.routes").default);
 	app.use("/api/v1/payments", require("./api/routes/v1/payment.routes").default);
 	app.use("/api/v1/inventory", require("./api/routes/v1/inventory.routes").default);

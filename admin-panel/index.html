@@ -36,6 +36,7 @@
             <button class="tab" data-tab="gyms">Gyms</button>
             <button class="tab" data-tab="plans">Plans</button>
             <button class="tab" data-tab="billing">Billing</button>
+            <button class="tab" data-tab="whatsapp">WhatsApp</button>
           </nav>
           <button id="refresh" class="quiet-button" type="button">Refresh</button>
         </div>
@@ -78,6 +79,39 @@
           <div class="table-wrap"><table><thead><tr><th>Gym</th><th>Member</th><th>Amount</th><th>Status</th><th>Due</th></tr></thead><tbody id="member-payments-table"></tbody></table></div>
           <h2>Refund requests</h2>
           <div class="table-wrap"><table><thead><tr><th>Gym</th><th>Amount</th><th>Reason</th><th>Status</th><th>Gateway reference</th><th>Updated</th></tr></thead><tbody id="refunds-table"></tbody></table></div>
+        </section>
+
+        <section class="view" id="view-whatsapp">
+          <p id="whatsapp-admin-message" class="message" role="status"></p>
+          <h2>WhatsApp pricing &amp; wallet</h2>
+          <p class="note">Set the flat price in rupees. WhatsApp delivery stays disabled until a provider is connected. Credit a wallet only after confirming payment.</p>
+          <form id="whatsapp-settings-form" class="inline-form">
+            <label>Flat price per paid message (₹)<input name="price" type="number" min="0.01" step="0.01" placeholder="Leave empty to disable paid sends"></label>
+            <label>Low-balance alert threshold (₹)<input name="threshold" type="number" min="0" step="0.01" value="20" required></label>
+            <button type="submit">Save pricing</button>
+          </form>
+          <h2>Message templates</h2>
+          <p class="note">Only mark a template approved after the WhatsApp provider has approved the exact template key and language.</p>
+          <form id="whatsapp-template-form" class="inline-form">
+            <label>Template key<input name="key" maxlength="200" required></label>
+            <label>Display name<input name="name" maxlength="100" required></label>
+            <label>Category<select name="category"><option>UTILITY</option><option>MARKETING</option></select></label>
+            <label>Language<input name="language" value="en" maxlength="20" required></label>
+            <label>Variables (comma-separated)<input name="variables" placeholder="name,gym_name,expiry_date"></label>
+            <label>Preview text<textarea name="preview" maxlength="1000" required></textarea></label>
+            <label><input name="approved" type="checkbox"> Provider approved</label>
+            <label><input name="visible" type="checkbox" checked> Visible to gym owners</label>
+            <button type="submit">Add template</button>
+          </form>
+          <div class="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>Provider key</th><th>Approval</th><th>Visibility</th><th></th></tr></thead><tbody id="whatsapp-templates-table"></tbody></table></div>
+          <h2>Gym wallets</h2>
+          <form id="whatsapp-credit-form" class="inline-form">
+            <label>Gym<select name="gymId" id="whatsapp-gym-select" required></select></label>
+            <label>Credit amount (₹)<input name="amount" type="number" min="0.01" step="0.01" required></label>
+            <label>Payment/reference note<input name="note" maxlength="300" required></label>
+            <button type="submit">Credit wallet</button>
+          </form>
+          <div class="table-wrap"><table><thead><tr><th>Gym</th><th>Owner</th><th>Enabled</th><th>Balance</th><th>Free utility used</th></tr></thead><tbody id="whatsapp-wallets-table"></tbody></table></div>
         </section>
       </section>
     </main>
