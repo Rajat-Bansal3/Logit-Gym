@@ -80,6 +80,10 @@ function serializeMember(member: WhatsAppMemberRecord) {
 	};
 }
 
+function normalizeMemberIds(memberIds: string[]): string[] {
+	return [...new Set(memberIds.map((id) => id.trim()).filter(Boolean))];
+}
+
 function normalizeIndianPhone(phone: string | null): string {
 	const digits = (phone ?? "").replace(/\D/g, "");
 	if (digits.length === 10) {
@@ -427,11 +431,9 @@ export class WhatsAppService {
 
 	async quoteBulk(gymId: string, ownerId: string, memberIds: string[], templateId: string) {
 		await this.assertOwnerGym(gymId, ownerId);
+		memberIds = normalizeMemberIds(memberIds);
 		if (memberIds.length === 0 || memberIds.length > WHATSAPP_BULK_SEND_LIMIT) {
 			throw new AppError("Select between 1 and 100 members per send.", 400);
-		}
-		if (new Set(memberIds).size !== memberIds.length) {
-			throw new AppError("A member was selected more than once.", 400);
 		}
 		const [wallet, template, settings, members] = await Promise.all([
 			this.ensureWallet(gymId),
@@ -541,6 +543,7 @@ export class WhatsAppService {
 		idempotencyKey: string,
 		attestConsent: boolean,
 	) {
+		memberIds = normalizeMemberIds(memberIds);
 		const quote = await this.quoteBulk(gymId, ownerId, memberIds, templateId);
 		if (!quote.providerConfigured) {
 			throw new AppError(

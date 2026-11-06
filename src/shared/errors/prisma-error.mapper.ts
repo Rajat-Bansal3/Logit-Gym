@@ -42,6 +42,12 @@ export function mapPrismaError(error: unknown): AppError | null {
                 return new AppError("This action can't be completed because it references data that no longer exists.", 409);
             case "P2014":
                 return new AppError("This action would break a required relationship between records.", 409);
+            case "P2021":
+            case "P2022":
+                return new AppError(
+                    "The server database needs an update before this request can continue. Please contact Synapse support.",
+                    503,
+                );
             default:
                 return new AppError("We couldn't process that request. Please try again.", 400);
         }
