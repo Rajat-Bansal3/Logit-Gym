@@ -13,6 +13,7 @@ import { client } from "../../shared/utils/prisma";
 const FREE_UTILITY_LIMIT = 100;
 const DEFAULT_LOW_BALANCE_THRESHOLD_PAISE = 2000;
 const WHATSAPP_MEMBER_PAGE_SIZE = 100;
+const WHATSAPP_BULK_SEND_LIMIT = 100;
 
 export type WhatsAppProviderRequest = {
 	to: string;
@@ -53,7 +54,12 @@ const memberSelect = {
 	status: true,
 	currentMembership: { select: { endDate: true, isPaused: true } },
 	whatsappConsent: {
-		select: { utilityOptIn: true, marketingOptIn: true },
+		select: {
+			utilityOptIn: true,
+			marketingOptIn: true,
+			utilityOptedOutAt: true,
+			marketingOptedOutAt: true,
+		},
 	},
 } satisfies Prisma.MemberSelect;
 
@@ -69,6 +75,8 @@ function serializeMember(member: WhatsAppMemberRecord) {
 		membershipPaused: member.currentMembership?.isPaused ?? false,
 		utilityOptIn: member.whatsappConsent?.utilityOptIn ?? false,
 		marketingOptIn: member.whatsappConsent?.marketingOptIn ?? false,
+		utilityOptedOut: member.whatsappConsent?.utilityOptedOutAt != null,
+		marketingOptedOut: member.whatsappConsent?.marketingOptedOutAt != null,
 	};
 }
 
@@ -382,6 +390,8 @@ export class WhatsAppService {
 				...input,
 				utilityOptedInAt: input.utilityOptIn ? now : null,
 				marketingOptedInAt: input.marketingOptIn ? now : null,
+				utilityOptedOutAt: input.utilityOptIn ? null : now,
+				marketingOptedOutAt: input.marketingOptIn ? null : now,
 			},
 			update: {
 				recordedBy: ownerId,
@@ -391,11 +401,13 @@ export class WhatsAppService {
 						? current.utilityOptedInAt
 						: now
 					: null,
+				utilityOptedOutAt: input.utilityOptIn ? null : now,
 				marketingOptedInAt: input.marketingOptIn
 					? current?.marketingOptIn
 						? current.marketingOptedInAt
 						: now
 					: null,
+				marketingOptedOutAt: input.marketingOptIn ? null : now,
 			},
 		});
 		return { memberId, ...input };
@@ -411,6 +423,220 @@ export class WhatsAppService {
 			include: messageInclude,
 		});
 		return rows.map(serializeMessage);
+	}
+
+	async quoteBulk(gymId: string, ownerId: string, memberIds: string[], templateId: string) {
+		await this.assertOwnerGym(gymId, ownerId);
+		if (memberIds.length === 0 || memberIds.length > WHATSAPP_BULK_SEND_LIMIT) {
+			throw new AppError("Select between 1 and 100 members per send.", 400);
+		}
+		if (new Set(memberIds).size !== memberIds.length) {
+			throw new AppError("A member was selected more than once.", 400);
+		}
+		const [wallet, template, settings, members] = await Promise.all([
+			this.ensureWallet(gymId),
+			client.whatsAppTemplate.findFirst({
+				where: { id: templateId, isVisible: true, providerApproved: true },
+			}),
+			client.whatsAppGlobalSettings.findUnique({ where: { id: "global" } }),
+			client.member.findMany({
+				where: { id: { in: memberIds }, gymId, isDeleted: false },
+				select: {
+					id: true,
+					phone: true,
+					whatsappConsent: {
+						select: {
+							utilityOptIn: true,
+							marketingOptIn: true,
+							utilityOptedOutAt: true,
+							marketingOptedOutAt: true,
+						},
+					},
+				},
+			}),
+		]);
+		if (!wallet.enabled) {
+			throw new AppError("Turn on WhatsApp messaging for this gym first.", 409);
+		}
+		if (!template) {
+			throw new AppError("This message template is no longer available.", 409);
+		}
+		if (members.length !== memberIds.length) {
+			throw new AppError("One or more selected members are no longer available.", 404);
+		}
+		const isUtility = template.category === WhatsAppTemplateCategory.UTILITY;
+		const optedOutMemberIds = members
+			.filter((member) =>
+				isUtility
+					? member.whatsappConsent?.utilityOptedOutAt != null
+					: member.whatsappConsent?.marketingOptedOutAt != null,
+			)
+			.map((member) => member.id);
+		const consentRequiredMemberIds = members
+			.filter((member) =>
+				isUtility
+					? !member.whatsappConsent?.utilityOptIn &&
+						member.whatsappConsent?.utilityOptedOutAt == null
+					: !member.whatsappConsent?.marketingOptIn &&
+						member.whatsappConsent?.marketingOptedOutAt == null,
+			)
+			.map((member) => member.id);
+		const invalidPhoneMemberIds = members
+			.filter((member) => {
+				try {
+					normalizeIndianPhone(member.phone);
+					return false;
+				} catch (error) {
+					if (error instanceof AppError) {
+						return true;
+					}
+					throw error;
+				}
+			})
+			.map((member) => member.id);
+		const freeMessages = isUtility
+			? Math.min(
+					memberIds.length,
+					Math.max(0, FREE_UTILITY_LIMIT - wallet.utilityFreeUsed - wallet.utilityFreeReserved),
+				)
+			: 0;
+		const paidMessages = memberIds.length - freeMessages;
+		const pricePerMessagePaise = settings?.pricePerMessagePaise ?? null;
+		const estimatedCostPaise =
+			paidMessages === 0
+				? 0
+				: pricePerMessagePaise === null || pricePerMessagePaise <= 0
+					? null
+					: paidMessages * pricePerMessagePaise;
+		const maximumAffordableRecipients =
+			pricePerMessagePaise === null || pricePerMessagePaise <= 0
+				? freeMessages
+				: Math.min(
+						memberIds.length,
+						freeMessages + Math.floor(wallet.balancePaise / pricePerMessagePaise),
+					);
+		return {
+			templateName: template.name,
+			category: template.category,
+			recipientCount: memberIds.length,
+			freeMessages,
+			paidMessages,
+			pricePerMessagePaise,
+			estimatedCostPaise,
+			walletBalancePaise: wallet.balancePaise,
+			maximumAffordableRecipients,
+			overBudgetRecipients: Math.max(0, memberIds.length - maximumAffordableRecipients),
+			consentRequiredMemberIds,
+			optedOutMemberIds,
+			invalidPhoneMemberIds,
+			providerConfigured: provider.configured,
+		};
+	}
+
+	async sendBulk(
+		gymId: string,
+		ownerId: string,
+		memberIds: string[],
+		templateId: string,
+		idempotencyKey: string,
+		attestConsent: boolean,
+	) {
+		const quote = await this.quoteBulk(gymId, ownerId, memberIds, templateId);
+		if (!quote.providerConfigured) {
+			throw new AppError(
+				"WhatsApp sending is not set up yet. No message or charge was made. Please contact Synapse support.",
+				503,
+			);
+		}
+		if (quote.optedOutMemberIds.length > 0) {
+			throw new AppError(
+				`${quote.optedOutMemberIds.length} selected member(s) have opted out. Remove them to continue.`,
+				409,
+			);
+		}
+		if (quote.invalidPhoneMemberIds.length > 0) {
+			throw new AppError(
+				`${quote.invalidPhoneMemberIds.length} selected member(s) need a valid Indian mobile number.`,
+				400,
+			);
+		}
+		if (quote.estimatedCostPaise === null) {
+			throw new AppError("Paid WhatsApp messaging is not priced yet. Please contact Synapse.", 409);
+		}
+		if (quote.estimatedCostPaise > quote.walletBalancePaise) {
+			throw new AppError(
+				`This selection costs ₹${(quote.estimatedCostPaise / 100).toFixed(2)}, but your balance is ₹${(quote.walletBalancePaise / 100).toFixed(2)}. Remove ${quote.overBudgetRecipients} member(s) or top up.`,
+				402,
+			);
+		}
+		if (quote.consentRequiredMemberIds.length > 0 && !attestConsent) {
+			throw new AppError(
+				"Confirm that the selected members agreed to receive this type of WhatsApp message before sending.",
+				409,
+			);
+		}
+		if (attestConsent && quote.consentRequiredMemberIds.length > 0) {
+			const now = new Date();
+			await client.$transaction(async (tx) => {
+				for (const memberId of quote.consentRequiredMemberIds) {
+					const current = await tx.whatsAppConsent.findUnique({ where: { memberId } });
+					const isUtility = quote.category === WhatsAppTemplateCategory.UTILITY;
+					await tx.whatsAppConsent.upsert({
+						where: { memberId },
+						create: {
+							memberId,
+							utilityOptIn: isUtility,
+							marketingOptIn: !isUtility,
+							utilityOptedInAt: isUtility ? now : null,
+							marketingOptedInAt: isUtility ? null : now,
+							recordedBy: ownerId,
+						},
+						update: {
+							...(isUtility
+								? {
+										utilityOptIn: true,
+										utilityOptedInAt: current?.utilityOptIn ? current.utilityOptedInAt : now,
+									}
+								: {
+										marketingOptIn: true,
+										marketingOptedInAt: current?.marketingOptIn ? current.marketingOptedInAt : now,
+									}),
+							recordedBy: ownerId,
+						},
+					});
+				}
+			});
+		}
+		const messages = [];
+		let stoppedReason: string | null = null;
+		for (const memberId of memberIds) {
+			try {
+				messages.push(
+					await this.sendMessage(
+						gymId,
+						ownerId,
+						memberId,
+						templateId,
+						`${idempotencyKey}:${memberId}`,
+					),
+				);
+			} catch (error) {
+				if (!(error instanceof AppError)) {
+					throw error;
+				}
+				stoppedReason = error.message;
+				break;
+			}
+		}
+		return {
+			messages,
+			requestedCount: memberIds.length,
+			attemptedCount: messages.length,
+			failedCount: messages.filter((message) => message.status === WhatsAppMessageStatus.FAILED)
+				.length,
+			notAttemptedCount: memberIds.length - messages.length,
+			stoppedReason,
+		};
 	}
 
 	async sendMessage(
@@ -453,6 +679,13 @@ export class WhatsAppService {
 		}
 		if (!template) {
 			throw new AppError("This message template is no longer available.", 409);
+		}
+		const optedOut =
+			template.category === WhatsAppTemplateCategory.UTILITY
+				? member.whatsappConsent?.utilityOptedOutAt != null
+				: member.whatsappConsent?.marketingOptedOutAt != null;
+		if (optedOut) {
+			throw new AppError("This member has opted out of this type of WhatsApp message.", 409);
 		}
 		const allowed =
 			template.category === WhatsAppTemplateCategory.UTILITY

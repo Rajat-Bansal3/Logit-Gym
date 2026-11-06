@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { AppError } from "../../shared/errors/app-errors";
@@ -13,6 +14,12 @@ const sendSchema = z.object({
 	memberId: z.string().min(1),
 	templateId: z.string().min(1),
 });
+const bulkSendSchema = z.object({
+	memberIds: z.array(z.string().min(1)).min(1).max(100),
+	templateId: z.string().min(1),
+	attestConsent: z.boolean().default(false),
+});
+const bulkQuoteSchema = bulkSendSchema.omit({ attestConsent: true });
 const pageSchema = z.object({
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -64,6 +71,32 @@ export class WhatsAppController {
 		res.status(201).json({
 			success: true,
 			data: await service.sendMessage(gymId, ownerId, input.memberId, input.templateId, key),
+		});
+	};
+
+	quoteBulk = async (req: Request, res: Response) => {
+		const { gymId, ownerId } = ownerContext(req);
+		const input = bulkQuoteSchema.parse(req.body);
+		res.json({
+			success: true,
+			data: await service.quoteBulk(gymId, ownerId, input.memberIds, input.templateId),
+		});
+	};
+
+	sendBulk = async (req: Request, res: Response) => {
+		const { gymId, ownerId } = ownerContext(req);
+		const input = bulkSendSchema.parse(req.body);
+		const key = req.header("Idempotency-Key") || randomUUID();
+		res.status(201).json({
+			success: true,
+			data: await service.sendBulk(
+				gymId,
+				ownerId,
+				input.memberIds,
+				input.templateId,
+				key,
+				input.attestConsent,
+			),
 		});
 	};
 

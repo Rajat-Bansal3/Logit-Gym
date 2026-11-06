@@ -36,6 +36,18 @@ router.get(
 	catchAsync(whatsAppController.getHistory),
 );
 router.post(
+	"/:gymId/whatsapp/messages/quote",
+	authMiddleware,
+	roleMiddleware("OWNER"),
+	catchAsync(whatsAppController.quoteBulk),
+);
+router.post(
+	"/:gymId/whatsapp/messages/bulk",
+	authMiddleware,
+	roleMiddleware("OWNER"),
+	catchAsync(whatsAppController.sendBulk),
+);
+router.post(
 	"/:gymId/whatsapp/messages",
 	authMiddleware,
 	roleMiddleware("OWNER"),

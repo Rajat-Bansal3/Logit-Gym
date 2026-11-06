@@ -720,6 +720,8 @@ model WhatsAppConsent {
   marketingOptIn     Boolean  @default(false)
   utilityOptedInAt   DateTime?
   marketingOptedInAt DateTime?
+  utilityOptedOutAt  DateTime?
+  marketingOptedOutAt DateTime?
   recordedBy         String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

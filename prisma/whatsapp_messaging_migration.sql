@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS "whatsapp_consents" (
   "marketingOptIn" BOOLEAN NOT NULL DEFAULT FALSE,
   "utilityOptedInAt" TIMESTAMP(3),
   "marketingOptedInAt" TIMESTAMP(3),
+  "utilityOptedOutAt" TIMESTAMP(3),
+  "marketingOptedOutAt" TIMESTAMP(3),
   "recordedBy" TEXT,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -83,6 +85,10 @@ CREATE TABLE IF NOT EXISTS "whatsapp_consents" (
 
 ALTER TABLE "whatsapp_consents"
   ADD COLUMN IF NOT EXISTS "recordedBy" TEXT;
+ALTER TABLE "whatsapp_consents"
+  ADD COLUMN IF NOT EXISTS "utilityOptedOutAt" TIMESTAMP(3);
+ALTER TABLE "whatsapp_consents"
+  ADD COLUMN IF NOT EXISTS "marketingOptedOutAt" TIMESTAMP(3);
 
 CREATE TABLE IF NOT EXISTS "whatsapp_messages" (
   "id" TEXT NOT NULL,
