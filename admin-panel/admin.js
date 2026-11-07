@@ -166,12 +166,20 @@ function renderWhatsAppAdmin(data) {
     .join("") || '<option value="">No wallets yet</option>';
 }
 
+async function getWhatsAppAdminData() {
+  const response = await api("/whatsapp");
+  const data = response?.data ?? response;
+  if (!data?.settings || !Array.isArray(data.templates) || !Array.isArray(data.wallets)) {
+    throw new Error("WhatsApp admin data was incomplete. Refresh and try again.");
+  }
+  return data;
+}
+
 async function loadWhatsAppAdmin() {
   const message = document.querySelector("#whatsapp-admin-message");
   message.textContent = "Loading WhatsApp settings…";
   try {
-    const data = await api("/whatsapp");
-    renderWhatsAppAdmin(data);
+    renderWhatsAppAdmin(await getWhatsAppAdminData());
     message.textContent = "WhatsApp admin settings updated.";
   } catch (error) {
     message.textContent = error.message;
@@ -231,7 +239,10 @@ document.querySelector("#whatsapp-settings-form").addEventListener("submit", asy
 
 document.querySelector("#whatsapp-template-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
+  const templateForm = event.currentTarget;
+  const submitButton = templateForm.querySelector('button[type="submit"]');
+  const form = new FormData(templateForm);
+  submitButton.disabled = true;
   try {
     await api("/whatsapp/templates", {
       method: "POST",
@@ -246,17 +257,22 @@ document.querySelector("#whatsapp-template-form").addEventListener("submit", asy
         isVisible: form.get("visible") === "on",
       }),
     });
-    event.currentTarget.reset();
+    templateForm.reset();
     await loadWhatsAppAdmin();
   } catch (error) {
     document.querySelector("#whatsapp-admin-message").textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
   }
 });
 
 document.querySelector("#whatsapp-credit-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
+  const creditForm = event.currentTarget;
+  const submitButton = creditForm.querySelector('button[type="submit"]');
+  const form = new FormData(creditForm);
   const gymId = String(form.get("gymId"));
+  submitButton.disabled = true;
   try {
     await api(`/whatsapp/wallets/${encodeURIComponent(gymId)}/credit`, {
       method: "POST",
@@ -265,10 +281,12 @@ document.querySelector("#whatsapp-credit-form").addEventListener("submit", async
         note: form.get("note"),
       }),
     });
-    event.currentTarget.reset();
+    creditForm.reset();
     await loadWhatsAppAdmin();
   } catch (error) {
     document.querySelector("#whatsapp-admin-message").textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
   }
 });
 
@@ -276,7 +294,7 @@ document.querySelector("#whatsapp-templates-table").addEventListener("click", as
   const button = event.target.closest("[data-whatsapp-template]");
   if (!button) return;
   try {
-    const data = await api("/whatsapp");
+    const data = await getWhatsAppAdminData();
     const template = data.templates.find((item) => item.id === button.dataset.whatsappTemplate);
     if (!template) throw new Error("Template no longer exists. Refresh and try again.");
     await api(`/whatsapp/templates/${encodeURIComponent(template.id)}`, {
