@@ -12,11 +12,14 @@ model User {
   email     String?
   username  String   @unique
   password  String
+  referralCode String? @unique
   role      UserRole
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   gym       Gym[]
   member    Member?
+  sentReferrals OwnerReferral[] @relation("OwnerReferralSender")
+  receivedReferral OwnerReferral? @relation("OwnerReferralRecipient")
 
   deviceTokens DeviceToken[]
 
@@ -647,6 +650,13 @@ enum WhatsAppWalletTransactionKind {
   TOP_UP
   MESSAGE_CHARGE
   MESSAGE_REFUND
+  REFERRAL_REWARD
+}
+
+enum OwnerReferralStatus {
+  IN_PROGRESS
+  REWARDED
+  EXPIRED
 }
 
 model WhatsAppGlobalSettings {
@@ -705,12 +715,38 @@ model WhatsAppWalletLedger {
   balanceAfter   Int
   note           String?
   reference      String?
+  referralId     String?
   createdAt      DateTime                       @default(now())
   wallet         WhatsAppWallet                 @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  referral       OwnerReferral?                 @relation(fields: [referralId], references: [id], onDelete: Restrict)
 
   @@index([walletId, createdAt])
   @@index([reference])
+  @@unique([referralId, walletId])
   @@map("whatsapp_wallet_ledger")
+}
+
+model OwnerReferral {
+  id                  String               @id @default(cuid())
+  code                String
+  referrerUserId      String
+  referredUserId      String               @unique
+  status              OwnerReferralStatus  @default(IN_PROGRESS)
+  rewardAmountPaise   Int                  @default(10000)
+  referredAt          DateTime             @default(now())
+  expiresAt           DateTime
+  gymSetupAt          DateTime?
+  planPurchasedAt     DateTime?
+  completedAt         DateTime?
+  referrerRewardedAt  DateTime?
+  referredRewardedAt  DateTime?
+  referrer            User                 @relation("OwnerReferralSender", fields: [referrerUserId], references: [id], onDelete: Restrict)
+  referredUser        User                 @relation("OwnerReferralRecipient", fields: [referredUserId], references: [id], onDelete: Restrict)
+  walletLedger        WhatsAppWalletLedger[]
+
+  @@index([referrerUserId, referredAt])
+  @@index([status, expiresAt])
+  @@map("owner_referrals")
 }
 
 model WhatsAppConsent {

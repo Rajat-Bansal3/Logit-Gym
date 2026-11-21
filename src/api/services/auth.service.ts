@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import { env } from "../../env";
 import { UserRole } from "../../generated/enums";
+import { AppError } from "../../shared/errors/app-errors";
 import { AuthError, AuthErrorCode } from "../../shared/errors/auth-errors";
 import type {
 	AccessTokenPayload,
@@ -13,11 +14,14 @@ import type {
 import type { BaseResponse, loginReturnType, registerReturnType } from "../../shared/types/returns";
 import { client } from "../../shared/utils/prisma";
 import { UserRepository } from "../repositories/user.repository";
+import { ReferralService } from "./referral.service";
 
 export class AuthService {
 	private userRepository: UserRepository;
+	private referralService: ReferralService;
 	constructor() {
 		this.userRepository = new UserRepository(client);
+		this.referralService = new ReferralService({ prisma: client });
 	}
 
 	async login(data: LoginInput): Promise<BaseResponse<loginReturnType>> {
@@ -54,13 +58,18 @@ export class AuthService {
 				"This username is already taken. Please choose a different one.",
 			);
 		}
+		if (data.referralCode && data.role !== UserRole.OWNER) {
+			throw new AppError("Referral codes are only available when creating an owner account.", 400);
+		}
 		const pass = await this.hashPassword(data.password);
-		const newUser = await this.userRepository.createUser({
-			username: data.username,
-			email: data.email,
-			password: pass,
-			role: data.role,
-		});
+		const newUser = data.referralCode
+			? await this.referralService.registerOwnerWithReferral(data, pass)
+			: await this.userRepository.createUser({
+					username: data.username,
+					email: data.email,
+					password: pass,
+					role: data.role,
+				});
 		const tokens = await this.generateTokens(newUser.id, newUser.role);
 		return {
 			message: "user registered successfully",

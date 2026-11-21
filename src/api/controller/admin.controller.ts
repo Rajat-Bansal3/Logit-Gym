@@ -4,6 +4,7 @@ import { AuthError, AuthErrorCode } from "../../shared/errors/auth-errors";
 import {
 	AdminService,
 	adminPlanInputSchema,
+	adminReferralQuerySchema,
 	extendTrialInputSchema,
 	gymStatusInputSchema,
 	refundInputSchema,
@@ -17,6 +18,10 @@ export class AdminController {
 	getGyms = async (_req: Request, res: Response) => res.json(await service.getGyms());
 	getPlans = async (_req: Request, res: Response) => res.json(await service.getPlans());
 	getBilling = async (_req: Request, res: Response) => res.json(await service.getBilling());
+	getReferrals = async (req: Request, res: Response) => {
+		const { page, limit } = adminReferralQuerySchema.parse(req.query);
+		res.json(await service.getReferrals(page, limit));
+	};
 	createPlan = async (req: Request, res: Response) => {
 		res.status(201).json(await service.createPlan(adminPlanInputSchema.parse(req.body)));
 	};

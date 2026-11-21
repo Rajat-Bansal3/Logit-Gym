@@ -98,6 +98,22 @@ export class GymRepository {
 					gymId: gym.id,
 				},
 			});
+			await tx.ownerReferral.updateMany({
+				where: {
+					referredUserId: data.ownerId,
+					status: "IN_PROGRESS",
+					expiresAt: { gt: gym.createdAt },
+				},
+				data: { gymSetupAt: gym.createdAt },
+			});
+			await tx.ownerReferral.updateMany({
+				where: {
+					referredUserId: data.ownerId,
+					status: "IN_PROGRESS",
+					expiresAt: { lte: gym.createdAt },
+				},
+				data: { status: "EXPIRED" },
+			});
 			return gym;
 		});
 		return gym;
@@ -266,10 +282,7 @@ export class GymRepository {
 			where: { gymId },
 			_max: { membershipCode: true },
 		});
-		return Math.max(
-			base + gym.biometricCounter,
-			(highest._max.membershipCode ?? base - 1) + 1,
-		);
+		return Math.max(base + gym.biometricCounter, (highest._max.membershipCode ?? base - 1) + 1);
 	};
 	delete = async (gymId: string): Promise<void> => {
 		await this.client.gym.update({

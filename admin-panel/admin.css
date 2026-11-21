@@ -55,6 +55,7 @@ td button { padding: 6px 9px; margin: 2px; font-size: 12px; }
 td button.secondary { color: var(--ink); background: #e8efea; }
 td button.danger { background: var(--warning); }
 .inline-form { display: grid; grid-template-columns: 1.1fr .8fr 1fr .55fr auto; gap: 10px; align-items: end; margin-bottom: 18px; padding: 14px; background: #e8f0e9; border-radius: 7px; }
+.pagination { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 12px; }
 .message { min-height: 18px; margin: 10px 0 0; color: var(--warning); font-size: 13px; }
 .hidden { display: none !important; }
 .view { display: none; }

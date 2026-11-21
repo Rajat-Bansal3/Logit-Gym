@@ -32,6 +32,7 @@ import { GymRepository, type gym_with_profile } from "../repositories/gym.reposi
 import { MachineRepository } from "../repositories/machine.repository";
 import { MemberRepository } from "../repositories/member.repository";
 import { MachineAddonService } from "./machine-addon.service";
+import { ReferralService } from "./referral.service";
 import { type gym_with_sub, PlanRepository } from "../repositories/plan.repository";
 
 export class GymService {
@@ -42,6 +43,7 @@ export class GymService {
 	private bulkRepository: BulkRepository;
 	private memberRepository: MemberRepository;
 	private machineAddonService: MachineAddonService;
+	private referralService: ReferralService;
 
 	constructor({ prisma = client }: { prisma: PrismaClient }) {
 		this.gymRepository = new GymRepository(prisma);
@@ -51,6 +53,7 @@ export class GymService {
 		this.bulkRepository = new BulkRepository(prisma);
 		this.memberRepository = new MemberRepository(prisma);
 		this.machineAddonService = new MachineAddonService(prisma);
+		this.referralService = new ReferralService({ prisma });
 	}
 
 	async createGym(
@@ -528,6 +531,7 @@ export class GymService {
 		// idempotency guard
 		const existing = await this.planRepository.findInvoiceByGatewayId(payment.id);
 		if (existing) {
+			await this.referralService.rewardReferralForPaidInvoice(subscription.notes.gymId, payment.id);
 			return;
 		}
 
@@ -541,6 +545,7 @@ export class GymService {
 			currentPeriodStart: new Date(subscription.current_start * 1000),
 			currentPeriodEnd: new Date(subscription.current_end * 1000),
 		});
+		await this.referralService.rewardReferralForPaidInvoice(subscription.notes.gymId, payment.id);
 	};
 
 	private handleFailedSubscriptionPayment = async (payment: any): Promise<void> => {

@@ -4,6 +4,8 @@ const dashboard = document.querySelector("#dashboard");
 const loginMessage = document.querySelector("#login-message");
 const dashboardMessage = document.querySelector("#dashboard-message");
 const logoutButton = document.querySelector("#logout");
+const referralPageSize = 50;
+let referralPage = 1;
 
 const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value || 0);
 const date = (value) => value ? new Date(value).toLocaleDateString() : "-";
@@ -85,6 +87,73 @@ function renderBilling(billing) {
   document.querySelector("#subscriptions-table").innerHTML = billing.pendingSubscriptions.map((sub) => `<tr><td>${escapeHtml(sub.gym.name)}</td><td>${escapeHtml(sub.plan.name)}</td><td>${escapeHtml(sub.status)}</td><td>${escapeHtml(sub.renue_status)}</td><td>${date(sub.currentPeriodEnd)}</td></tr>`).join("") || '<tr><td colspan="5">No pending subscriptions.</td></tr>';
   document.querySelector("#member-payments-table").innerHTML = billing.memberPayments.map((payment) => `<tr><td>${escapeHtml(payment.gym.name)}</td><td>${escapeHtml(payment.member?.name || "-")}</td><td>${money(payment.amount)}</td><td>${escapeHtml(payment.status)}</td><td>${date(payment.dueDate)}</td></tr>`).join("") || '<tr><td colspan="5">No pending or failed gym payments.</td></tr>';
   document.querySelector("#refunds-table").innerHTML = billing.refunds.map((refund) => `<tr><td>${escapeHtml(refund.invoice.subscription.gym.name)}</td><td>${money(refund.amount)}</td><td>${escapeHtml(refund.reason)}</td><td>${escapeHtml(refund.status)}${refund.errorMessage ? `<small>${escapeHtml(refund.errorMessage)}</small>` : ""}</td><td>${escapeHtml(refund.gatewayRefundId || "-")}</td><td>${date(refund.updatedAt)}</td></tr>`).join("") || '<tr><td colspan="6">No refund requests.</td></tr>';
+}
+
+function renderReferrals(data) {
+  const summary = data.summary;
+  const stats = [
+    ["Total referrals", summary.totalReferrals],
+    ["In progress", summary.inProgress],
+    ["Rewarded", summary.rewarded],
+    ["Expired", summary.expired],
+    ["Total wallet rewards", formatRupees(summary.rewardsPaidPaise)],
+  ];
+  document.querySelector("#referral-stats").innerHTML = stats
+    .map(([label, value]) => `<div class="stat"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`)
+    .join("");
+
+  document.querySelector("#referrals-table").innerHTML = data.referrals.map((referral) => {
+    const referrer = referral.referrer;
+    const referred = referral.referredOwner;
+    const rewarded = referral.status === "REWARDED";
+    return `<tr>
+      <td>${escapeHtml(referral.status)}<small>${escapeHtml(referral.code)}</small></td>
+      <td>${escapeHtml(referrer.username)}<small>${escapeHtml(referrer.email || "-")} · ${escapeHtml(referrer.gymName || "No gym")}</small><small>${referrer.successfulReferralCount}/${referrer.referralCount} completed · ${formatRupees(referrer.rewardsEarnedPaise)} earned</small></td>
+      <td>${escapeHtml(referred.username)}<small>${escapeHtml(referred.email || "-")} · ${escapeHtml(referred.gymName || "Gym not set up")}</small></td>
+      <td>${dateTime(referred.accountCreatedAt)}</td>
+      <td>${dateTime(referral.gymSetupAt)}</td>
+      <td>${dateTime(referral.planPurchasedAt)}</td>
+      <td>${dateTime(referral.expiresAt)}</td>
+      <td>${rewarded ? `${formatRupees(referral.rewardAmountPaise)} × 2` : `${formatRupees(referral.rewardAmountPaise)} each`}<small>${rewarded ? `Both credited ${dateTime(referral.completedAt)}` : "Not credited"}</small></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="8">No referrals have been entered yet.</td></tr>';
+
+  const pagination = data.pagination;
+  referralPage = pagination.page;
+  document.querySelector("#referrals-page-label").textContent =
+    `Page ${pagination.page} of ${Math.max(1, pagination.totalPages)} · ${pagination.total} referrals`;
+  document.querySelector("#referrals-previous").disabled = pagination.page <= 1;
+  document.querySelector("#referrals-next").disabled =
+    pagination.page >= pagination.totalPages;
+  document.querySelector("#referrals-previous").dataset.referralsPage =
+    String(pagination.page - 1);
+  document.querySelector("#referrals-next").dataset.referralsPage =
+    String(pagination.page + 1);
+}
+
+function dateTime(value) {
+  return value ? new Date(value).toLocaleString() : "-";
+}
+
+async function loadReferralAdmin(page = 1) {
+  const message = document.querySelector("#referrals-admin-message");
+  message.textContent = "Loading referrals…";
+  try {
+    const response = await api(`/referrals?page=${page}&limit=${referralPageSize}`);
+    const data = response?.data ?? response;
+    if (!data?.summary || !Array.isArray(data.referrals) || !data.pagination) {
+      throw new Error("Referral data was incomplete. Refresh and try again.");
+    }
+    renderReferrals(data);
+    message.textContent = "Referral data updated.";
+  } catch (error) {
+    if ([401, 403].includes(error.status)) {
+      sessionStorage.removeItem(tokenKey);
+      showLogin(error.message);
+      return;
+    }
+    message.textContent = `Referral data could not be loaded: ${describeError(error)}`;
+  }
 }
 
 async function loadDashboard() {
@@ -211,12 +280,18 @@ logoutButton.addEventListener("click", () => {
   sessionStorage.removeItem(tokenKey);
   showLogin();
 });
-document.querySelector("#refresh").addEventListener("click", loadDashboard);
+document.querySelector("#refresh").addEventListener("click", async () => {
+  await loadDashboard();
+  if (document.querySelector("#view-referrals").classList.contains("active")) {
+    await loadReferralAdmin(referralPage);
+  }
+});
 
 document.querySelectorAll(".tab").forEach((button) => button.addEventListener("click", () => {
   document.querySelectorAll(".tab, .view").forEach((element) => element.classList.remove("active"));
   button.classList.add("active");
   document.querySelector(`#view-${button.dataset.tab}`).classList.add("active");
+  if (button.dataset.tab === "referrals") loadReferralAdmin(1);
 }));
 
 document.querySelector("#whatsapp-settings-form").addEventListener("submit", async (event) => {
@@ -335,6 +410,10 @@ document.querySelector("#plan-form").addEventListener("submit", async (event) =>
 dashboard.addEventListener("click", async (event) => {
   const button = event.target.closest("button");
   if (!button) return;
+  if (button.dataset.referralsPage) {
+    await loadReferralAdmin(Number(button.dataset.referralsPage));
+    return;
+  }
   try {
     if (button.dataset.gymStatus) {
       const suspended = button.dataset.suspended === "true";

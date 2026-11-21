@@ -17,6 +17,7 @@ router.get("/plans", catchAsync(controller.getPlans));
 router.post("/plans", catchAsync(controller.createPlan));
 router.patch("/plans/:planId", catchAsync(controller.setPlanActive));
 router.get("/billing", catchAsync(controller.getBilling));
+router.get("/referrals", catchAsync(controller.getReferrals));
 router.post("/refunds", catchAsync(controller.requestRefund));
 router.get("/whatsapp", catchAsync(whatsAppAdminController.getData));
 router.put("/whatsapp/settings", catchAsync(whatsAppAdminController.setSettings));

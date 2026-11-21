@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OwnerReferralStatus, WhatsAppWalletTransactionKind } from "../../generated/enums";
 import { AppError } from "../../shared/errors/app-errors";
 import { client } from "../../shared/utils/prisma";
 import { createRZPPlan, razorpay } from "../../shared/utils/rzp";
@@ -16,6 +17,10 @@ export const gymStatusInputSchema = z.object({ suspended: z.boolean() });
 export const refundInputSchema = z.object({
 	invoiceId: z.string().min(1),
 	reason: z.string().trim().min(3).max(500),
+});
+export const adminReferralQuerySchema = z.object({
+	page: z.coerce.number().int().min(1).max(100_000).default(1),
+	limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 export class AdminService {
@@ -226,6 +231,151 @@ export class AdminService {
 			}),
 		]);
 		return { invoices, memberPayments, pendingSubscriptions, refunds };
+	};
+
+	getReferrals = async (page: number, limit: number) => {
+		await client.ownerReferral.updateMany({
+			where: {
+				status: OwnerReferralStatus.IN_PROGRESS,
+				expiresAt: { lte: new Date() },
+			},
+			data: { status: OwnerReferralStatus.EXPIRED },
+		});
+
+		const skip = (page - 1) * limit;
+		const [
+			total,
+			pending,
+			rewarded,
+			expired,
+			rewardsPaid,
+			referrals,
+			referrerCounts,
+			referrerRewards,
+		] = await Promise.all([
+			client.ownerReferral.count(),
+			client.ownerReferral.count({ where: { status: OwnerReferralStatus.IN_PROGRESS } }),
+			client.ownerReferral.count({ where: { status: OwnerReferralStatus.REWARDED } }),
+			client.ownerReferral.count({ where: { status: OwnerReferralStatus.EXPIRED } }),
+			client.whatsAppWalletLedger.aggregate({
+				where: { kind: WhatsAppWalletTransactionKind.REFERRAL_REWARD },
+				_sum: { amountPaise: true },
+			}),
+			client.ownerReferral.findMany({
+				orderBy: { referredAt: "desc" },
+				skip,
+				take: limit,
+				select: {
+					id: true,
+					code: true,
+					status: true,
+					rewardAmountPaise: true,
+					referredAt: true,
+					expiresAt: true,
+					gymSetupAt: true,
+					planPurchasedAt: true,
+					completedAt: true,
+					referrerRewardedAt: true,
+					referredRewardedAt: true,
+					referrer: {
+						select: {
+							id: true,
+							username: true,
+							email: true,
+							gym: {
+								where: { isDeleted: false },
+								take: 1,
+								select: { id: true, name: true },
+							},
+						},
+					},
+					referredUser: {
+						select: {
+							id: true,
+							username: true,
+							email: true,
+							createdAt: true,
+							gym: {
+								where: { isDeleted: false },
+								take: 1,
+								select: { id: true, name: true },
+							},
+						},
+					},
+				},
+			}),
+			client.ownerReferral.groupBy({
+				by: ["referrerUserId"],
+				_count: { _all: true },
+			}),
+			client.ownerReferral.groupBy({
+				by: ["referrerUserId"],
+				where: { status: OwnerReferralStatus.REWARDED },
+				_count: { _all: true },
+				_sum: { rewardAmountPaise: true },
+			}),
+		]);
+
+		const countByOwner = new Map(
+			referrerCounts.map((entry) => [entry.referrerUserId, entry._count._all]),
+		);
+		const rewardsByOwner = new Map(
+			referrerRewards.map((entry) => [
+				entry.referrerUserId,
+				{
+					count: entry._count._all,
+					amountPaise: entry._sum.rewardAmountPaise ?? 0,
+				},
+			]),
+		);
+
+		return {
+			summary: {
+				totalReferrals: total,
+				inProgress: pending,
+				rewarded,
+				expired,
+				rewardsPaidPaise: rewardsPaid._sum.amountPaise ?? 0,
+			},
+			referrals: referrals.map((referral) => {
+				const referrerRewards = rewardsByOwner.get(referral.referrer.id);
+				return {
+					id: referral.id,
+					code: referral.code,
+					status: referral.status,
+					rewardAmountPaise: referral.rewardAmountPaise,
+					referredAt: referral.referredAt,
+					expiresAt: referral.expiresAt,
+					gymSetupAt: referral.gymSetupAt,
+					planPurchasedAt: referral.planPurchasedAt,
+					completedAt: referral.completedAt,
+					referrerRewardedAt: referral.referrerRewardedAt,
+					referredRewardedAt: referral.referredRewardedAt,
+					referrer: {
+						...referral.referrer,
+						gymName: referral.referrer.gym[0]?.name ?? null,
+						referralCount: countByOwner.get(referral.referrer.id) ?? 0,
+						successfulReferralCount: referrerRewards?.count ?? 0,
+						rewardsEarnedPaise: referrerRewards?.amountPaise ?? 0,
+						gym: undefined,
+					},
+					referredOwner: {
+						id: referral.referredUser.id,
+						username: referral.referredUser.username,
+						email: referral.referredUser.email,
+						accountCreatedAt: referral.referredUser.createdAt,
+						gymName: referral.referredUser.gym[0]?.name ?? null,
+						gymSetupAt: referral.gymSetupAt,
+					},
+				};
+			}),
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages: Math.ceil(total / limit),
+			},
+		};
 	};
 
 	requestRefund = async (invoiceId: string, reason: string, requestedBy: string) => {

@@ -3,6 +3,7 @@ import multer from "multer";
 import { uploadMultipleImage } from "../../../shared/utils/image_upload";
 import { catchAsync } from "../../../shared/utils/util_functions";
 import { GymController } from "../../controller/gym.controller";
+import { ReferralController } from "../../controller/referral.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { roleMiddleware } from "../../middleware/role.middleware";
 import memberRouter from "../v1/member.routes";
@@ -17,10 +18,12 @@ const upload = multer({
 
 const router = Router();
 const gymController = new GymController();
+const referralController = new ReferralController();
 //cron - sync data
 router.post("/sync-attendances", catchAsync(gymController.syncAttendance));
 router.use(authMiddleware);
 router.use("/:gymId/members", memberRouter);
+router.get("/referrals", roleMiddleware("OWNER"), catchAsync(referralController.getOwnerOverview));
 /**
  * Create a new gym
  */
@@ -41,7 +44,11 @@ router.post(
 );
 
 router.get("/membership-plans", roleMiddleware("OWNER"), gymController.getMembershipPackages);
-router.get("/device-commands", roleMiddleware("OWNER"), catchAsync(gymController.getDeviceCommands));
+router.get(
+	"/device-commands",
+	roleMiddleware("OWNER"),
+	catchAsync(gymController.getDeviceCommands),
+);
 /**
  * Get gym details
  */
@@ -56,7 +63,6 @@ router.patch(
 	catchAsync(gymController.updateGym),
 );
 
-
 router.post(
 	"/create-membership-plans",
 	roleMiddleware("OWNER"),
@@ -69,8 +75,6 @@ router.put(
 );
 
 router.delete("/delete-machine", roleMiddleware("OWNER"), catchAsync(gymController.removeMachine));
-
-
 
 /**
  * Delete a gym

@@ -44,6 +44,12 @@ export const registerSchema = z.object({
 		.min(6, "Password must be at least 6 characters"),
 
 	role: z.enum(UserRole).default("MEMBER"),
+	referralCode: z
+		.string()
+		.trim()
+		.toUpperCase()
+		.regex(/^[A-Z0-9]{6,12}$/, "Enter a valid referral code")
+		.optional(),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
